@@ -1,0 +1,63 @@
+emulator:
+  mumu_install_path: null
+  mumu_manager_path: C:\Program Files\Netease\MuMuPlayer\nx_main\MuMuManager.exe
+  adb_path: null
+  window_title_filters:
+  - MuMuPlayer
+  - MuMu模拟器
+  - MuMu Player
+  process_name_filters:
+  - MuMuPlayer.exe
+  - MuMuNxDevice.exe
+  - MuMuNxMain.exe
+  - NemuPlayer.exe
+  fallback_port_base: 16384
+  fallback_port_step: 32
+  fallback_max_instances: 30
+game:
+  package_name: com.devsisters.crg
+  main_activity: com.devsisters.CookieRunForKakao.OvenbreakX
+  launch_wait_seconds: 25
+  target_pet: Tater_Trader
+  player_name: '1738'
+referral:
+  link: https://cookierunglobal.onelink.me/
+  send_before_open: false
+run:
+  target_account_count: 1
+  cleanup_method: clear_data
+  create_new_account_each_cycle: true
+  new_accounts_file: data_output/new_accounts.txt
+license:
+  registered_devices: 1
+  max_devices: 1
+reroll:
+  target_treasure: Victor_Feather_Laurel_Wreath
+  target_item_display_name: Tater Trader + Victor's Feather Laurel Wreath
+  rolls_per_round: 10
+  unlimited_rolls: true
+  treasure_max_draws: 12
+  enable_treasure: true
+  enable_pet_luxury: true
+delete:
+  cooldown_seconds: 60
+telegram:
+  bot_token: ''
+  chat_id: ''
+templates:
+  root_dir: templates
+  match_threshold: 0.85
+  match_scales:
+  - 1.0
+automation:
+  step_retry_count: 3
+  step_retry_delay_seconds: 2
+  action_delay_seconds: 0.8
+  screenshot_on_error: true
+paths:
+  logs_dir: logs
+  error_screenshots_dir: logs/errors
+  output_dir: data_output
+discord:
+  webhook_url: https://discord.com/api/webhooks/1524101980283338886/oemCw6RMfg9I4l2445YX8O07TAGTuYdjvmCvFE0XGaF0lr0kiC3mzX40RaRvPmipYUry
+  enabled: true

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+logs/
+data_output/
+!logs/.gitkeep
+!data_output/.gitkeep
+
+# PyInstaller build artifacts (สร้างใหม่ด้วย build_exe.bat)
+build/
+dist/
+*.spec
