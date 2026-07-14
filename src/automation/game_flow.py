@@ -30,10 +30,9 @@ GameScreenState = Literal["lobby", "dev_login", "unknown"]
 
 def generate_random_email() -> str:
     """สุ่มอีเมล 4-5 ตัวอักษร (พิมพ์ใหญ่-เล็ก) + ตัวเลข 2 หลัก + @gmail.com"""
-    length = random.randint(4, 5)
     letters = string.ascii_letters
-    name = "".join(random.choice(letters) for _ in range(length))
-    numbers = "".join(random.choice(string.digits) for _ in range(2))
+    name = "".join(random.choice(letters) for _ in range(6))
+    numbers = "".join(random.choice(string.digits) for _ in range(3))
     return f"{name}{numbers}@gmail.com"
 
 
@@ -104,7 +103,7 @@ class GameFlow:
                 name="enter_password_1st",
                 templates=["login/password_box_1st.png"],
                 action=tap_matched_center_then_type(
-                    password, focus_delay=0.8, commit_with_enter=True
+                    password, focus_delay=0.8, commit_with_enter=False
                 ),
                 timeout=12.0,
                 post_delay=1.0,
@@ -113,18 +112,23 @@ class GameFlow:
                 name="enter_password_2nd",
                 templates=["login/password_box_2nd.png"],
                 action=tap_matched_center_then_type(
-                    password, focus_delay=0.8, commit_with_enter=True
+                    password, focus_delay=0.8, commit_with_enter=False
                 ),
                 timeout=12.0,
                 post_delay=1.0,
             ),
-            _button_step("check_and_handle_error", "login/error_submit.png", timeout=0.5, on_missing="skip"),
-            #_button_step("submit_password", "login/submit_password.png", timeout=12.0),
+            _button_step("submit_password", "login/submit_password.png", timeout=2.0),
+            #_button_step("check_and_handle_error", "login/error_submit.png", timeout=0.5, on_missing="skip"),
         ]
 
     def build_boot_steps(self, player_name: str = _DEFAULT_PLAYER_NAME) -> list[Step]:
         """รวม Login + Onboarding"""
         return [*self.build_login_steps(), *build_onboarding_steps(player_name)]
+
+    def has_login_error(self) -> bool:
+        """ตรวจว่ามี popup Error 40212 หรือไม่"""
+        result = self._match_on_screen("login/error_40212.png")
+        return result.found
 
     # === ส่วน onboarding (เหมือนเดิม) ===
     def _match_on_screen(self, template_rel: str) -> MatchResult:
@@ -187,16 +191,38 @@ class GameFlow:
         if self.detect_game_screen() == "lobby":
             return
 
-        steps = self.build_boot_steps(self.player_name)
         for attempt in range(1, max_recovery_attempts + 1):
             try:
-                self.runner.run_sequence(steps)
-                log.info("เข้าเกมสำเร็จ (Email login + onboarding)")
+                # ---------- Login ----------
+                self.runner.run_sequence(self.build_login_steps())
+
+                # รอให้ Popup Error ขึ้น (ถ้ามี)
+                time.sleep(1.0)
+
+                # ---------- ตรวจ Error ----------
+                if self.has_login_error():
+                    log.warning("พบ Login Error 40212")
+
+                    if attempt >= max_recovery_attempts:
+                        raise AutomationError("Login Error 40212")
+
+                    self.restart_game()
+                    continue
+
+                # ---------- Onboarding ----------
+                self.runner.run_sequence(
+                    build_onboarding_steps(self.player_name)
+                )
+
+                log.info("เข้าเกมสำเร็จ")
                 return
+
             except AutomationError:
                 log.exception("เข้าเกมล้มเหลว (ครั้งที่ %d)", attempt)
+
                 if attempt < max_recovery_attempts:
                     self.restart_game()
+
         raise AutomationError("เข้าเกมล้มเหลว")
 
     def ensure_ready(self) -> None:

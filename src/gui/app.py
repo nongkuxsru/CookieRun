@@ -506,25 +506,25 @@ class BotApp(tb.Window):
         )
         self.scan_button.pack(side=LEFT, expand=True, fill=X, padx=(0, 4))
         # เพิ่มปุ่มเปิด Emulator
-        tb.Button(
-            btn_row,
-            text="🚀 เปิด Emulator",
-            bootstyle="info",
-            command=self._open_selected_emulator,
-        ).pack(side=LEFT, expand=True, fill=X, padx=4)
+        # tb.Button(
+        #     btn_row,
+        #     text="🚀 เปิด Emulator",
+        #     bootstyle="info",
+        #     command=self._open_selected_emulator,
+        # ).pack(side=LEFT, expand=True, fill=X, padx=4)
         # เพิ่มปุ่ม Restart
-        tb.Button(
-            btn_row,
-            text="🔄 Restart Selected",
-            bootstyle="primary",
-            command=self._restart_selected_instances,
-        ).pack(side=LEFT, expand=True, fill=X, padx=4)
-        tb.Button(
-            btn_row,
-            text="🔄 Restart All",
-            bootstyle="primary-outline",
-            command=self._restart_all_instances,
-        ).pack(side=LEFT, expand=True, fill=X, padx=4)
+        # tb.Button(
+        #     btn_row,
+        #     text="🔄 Restart Selected",
+        #     bootstyle="primary",
+        #     command=self._restart_selected_instances,
+        # ).pack(side=LEFT, expand=True, fill=X, padx=4)
+        # tb.Button(
+        #     btn_row,
+        #     text="🔄 Restart All",
+        #     bootstyle="primary-outline",
+        #     command=self._restart_all_instances,
+        # ).pack(side=LEFT, expand=True, fill=X, padx=4)
         tb.Button(
             btn_row,
             text="✅ เลือกทั้งหมด",

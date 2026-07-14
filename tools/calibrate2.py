@@ -6,7 +6,7 @@ button/screen element and save it straight into templates/<category>/name.png
 so game_flow.py / pet_reroll.py can reference it.
 
 Usage (from the CookieRun/ root directory):
-    python tools/calibrate.py --instance 0 --category login --name dev_mode_button
+    python tools/calibrate2.py --instance 0 --category login --name dev_mode_button
 """
 
 from __future__ import annotations
