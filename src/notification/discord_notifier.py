@@ -1,4 +1,4 @@
-"""Discord Notifier สำหรับแจ้งเมื่อเจอของดี"""
+"""Discord Notifier สำหรับแจ้งเมื่อเจอของดี และจบ instance"""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ class DiscordNotifier:
         target_item: str,
         screenshot_path: str | None = None,
     ):
+        """แจ้งเมื่อเจอของดี"""
         if not self.enabled:
             return
 
@@ -48,20 +49,13 @@ class DiscordNotifier:
             files = {
                 "file": open(screenshot_path, "rb")
             }
-
-            payload["content"] = (
-                f"เจอ {target_item}\n"
-                f"Account: {account_id}"
-            )
+            payload["content"] = f"เจอ {target_item}\nAccount: {account_id}"
 
         try:
-
             if files:
                 response = requests.post(
                     self.webhook_url,
-                    data={
-                        "payload_json": json.dumps(payload)
-                    },
+                    data={"payload_json": json.dumps(payload)},
                     files=files,
                     timeout=10,
                 )
@@ -87,3 +81,31 @@ class DiscordNotifier:
         finally:
             if files:
                 files["file"].close()
+
+    def send_message(self, message: str):
+        """ส่งข้อความธรรมดา (เช่น จบ instance)"""
+        if not self.enabled:
+            return
+
+        payload = {
+            "username": "Nongku BOT",
+            "content": message
+        }
+
+        try:
+            response = requests.post(
+                self.webhook_url,
+                json=payload,
+                timeout=10,
+            )
+
+            if response.status_code in (200, 204):
+                log.info("ส่งข้อความ Discord สำเร็จ")
+            else:
+                log.warning(
+                    "ส่ง Discord ไม่สำเร็จ: %s %s",
+                    response.status_code,
+                    response.text,
+                )
+        except Exception:
+            log.exception("เชื่อมต่อ Discord ล้มเหลว")

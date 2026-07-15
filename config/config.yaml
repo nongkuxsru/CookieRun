@@ -59,5 +59,7 @@ paths:
   error_screenshots_dir: logs/errors
   output_dir: data_output
 discord:
-  webhook_url: https://discord.com/api/webhooks/1524101980283338886/oemCw6RMfg9I4l2445YX8O07TAGTuYdjvmCvFE0XGaF0lr0kiC3mzX40RaRvPmipYUry
+  found_webhook_url: https://discord.com/api/webhooks/1526595118528729098/BdcoW3WY1yMfDRGsXNvpD0mweVqzu-sgXJppCw01WKK0jIs9wXA1N5HGE_34e9-LcTZU
+  status_webhook_url: https://discord.com/api/webhooks/1526596882598461470/hsE-Rx-Oj6hMgH0B_A4S6-txt0ib2qdCJMniYxbTkug3T-8BO6d85hOyCT6oCXBpZfV5
+  error_webhook_url: ''
   enabled: true

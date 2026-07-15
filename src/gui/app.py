@@ -36,6 +36,7 @@ from src.core.logger import get_logger, setup_logging
 from src.data.recorder import Recorder
 from src.gui.automation_worker import AutomationWorker
 from src.gui.log_queue_handler import QueueLogHandler
+from src.notification.discord_manager import DiscordManager
 
 log = get_logger(__name__)
 
@@ -72,6 +73,7 @@ class BotApp(tb.Window):
         self.current_mode = tk.StringVar(value="reroll")
         self.instance_names = {}
         self.instance_status = {}   # {index: "running" | "success" | "stopped"}
+        self.discord = DiscordManager(self.config_obj)
 
         self._build_vars()
         self._attach_log_handler()
@@ -128,10 +130,17 @@ class BotApp(tb.Window):
         self.telegram_chat_id_var = tk.StringVar(value=cfg.get("telegram.chat_id", ""))
 
         # === Discord Webhook ===
-        self.discord_webhook_var = tk.StringVar(
-            value=cfg.get("discord.webhook_url", "")
+        self.discord_found_webhook_var = tk.StringVar(
+            value=cfg.get("discord.found_webhook_url", "")
         )
-        
+
+        self.discord_status_webhook_var = tk.StringVar(
+            value=cfg.get("discord.status_webhook_url", "")
+        )
+
+        self.discord_error_webhook_var = tk.StringVar(
+            value=cfg.get("discord.error_webhook_url", "")
+        )
 
     def _attach_log_handler(self) -> None:
         setup_logging(self.config_obj.get("paths.logs_dir", "logs"))
@@ -381,35 +390,39 @@ class BotApp(tb.Window):
             card, "🎫 สุ่มสัตว์เลี้ยง (Luxury จนเจอเป้าหมาย)", self.reroll_pet_var
         ).pack(anchor=W, pady=1)
 
-        tb.Label(
-            card,
-            text="Telegram (แจ้งเตือน)",
-            bootstyle="secondary",
-            font=(_FONT, 8),
-        ).pack(anchor=W, pady=(6, 2))
         tg_row = tb.Frame(card)
         tg_row.pack(fill=X)
         tg_row.columnconfigure(0, weight=1)
         tg_row.columnconfigure(1, weight=1)
         token_col = tb.Frame(tg_row)
         token_col.grid(row=0, column=0, sticky="ew", padx=(0, 3))
-        tb.Label(token_col, text="Bot Token", font=(_FONT, 8)).pack(anchor=W)
-        tb.Entry(token_col, textvariable=self.telegram_bot_token_var, font=(_FONT, 8)).pack(fill=X, pady=(1, 0))
-        chat_col = tb.Frame(tg_row)
-        chat_col.grid(row=0, column=1, sticky="ew", padx=(3, 0))
-        tb.Label(chat_col, text="Chat ID", font=(_FONT, 8)).pack(anchor=W)
-        tb.Entry(chat_col, textvariable=self.telegram_chat_id_var, font=(_FONT, 8)).pack(fill=X, pady=(1, 0))
 
         # === Discord Webhook ===
+        discord_frame = tb.Frame(card)
+        discord_frame.pack(fill=X, padx=5, pady=(5, 0))
         tb.Label(
-            card,
-            text="Discord Webhook (แจ้งเมื่อเจอของดี)",
-            bootstyle="secondary",
-            font=(_FONT, 8),
-        ).pack(anchor=W, pady=(8, 2))
-        discord_row = tb.Frame(card)
-        discord_row.pack(fill=X)
-        tb.Entry(discord_row, textvariable=self.discord_webhook_var, font=(_FONT, 8)).pack(fill=X, pady=(1, 0))
+            discord_frame,
+            text="Found Webhook (แจ้งเมื่อเจอไอดี)",
+            font=(_FONT, 8)
+        ).pack(anchor=W)
+
+        tb.Entry(
+            discord_frame,
+            textvariable=self.discord_found_webhook_var,
+            font=(_FONT, 8)
+        ).pack(fill=X, pady=(1, 5))
+
+        tb.Label(
+            discord_frame,
+            text="Status Webhook (แจ้งสถานะการทำงาน)",
+            font=(_FONT, 8)
+        ).pack(anchor=W)
+
+        tb.Entry(
+            discord_frame,
+            textvariable=self.discord_status_webhook_var,
+            font=(_FONT, 8)
+        ).pack(fill=X)
 
         self._update_rolls_input_state()
 
@@ -637,67 +650,79 @@ class BotApp(tb.Window):
 
     # ------------------------------------------------------------ bottom --
     def _build_control_bar(self, parent: tb.Frame) -> None:
-        footer = tb.Labelframe(parent, text="", padding=(12, 10))
+        footer = tb.Labelframe(parent, text="", padding=(16, 12))
         footer.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         parent.columnconfigure(0, weight=1)
 
         bar = tb.Frame(footer)
         bar.pack(fill=X)
 
+        # ---------------- Status ----------------
         self.status_label = tb.Label(
             bar,
-            text="●  พร้อม",
+            text="● พร้อม",
             bootstyle="secondary",
             font=("Segoe UI", 10, "bold"),
         )
-        self.status_label.pack(side=LEFT, padx=(4, 0))
+        self.status_label.pack(side=LEFT, padx=(6, 0), pady=2)
 
+        # ---------------- Buttons ----------------
         btn_row = tb.Frame(bar)
         btn_row.pack(side=RIGHT)
-        # เพิ่มปุ่ม เริ่มเฉพาะที่เลือก
-        tb.Button(
+
+        BTN_WIDE = 16
+        BTN_NORMAL = 11
+
+        self.start_selected_button = tb.Button(
             btn_row,
-            text="▶ เริ่มเฉพาะที่เลือก",
-            bootstyle="success",
+            text="▶ เริ่มที่เลือก",
+            bootstyle="primary",
             command=self._start_selected_instances,
-        ).pack(side=LEFT, expand=True, fill=X, padx=4)
+            width=BTN_WIDE,
+        )
+
         self.start_button = tb.Button(
             btn_row,
-            text="▶  เริ่มทั้งหมด",
+            text="▶ เริ่มทั้งหมด",
             bootstyle="success",
             command=self._on_start,
-            width=11,
+            width=BTN_WIDE,
         )
+
         self.pause_button = tb.Button(
             btn_row,
-            text="⏸  หยุด",
+            text="⏸ พัก",
             bootstyle="warning-outline",
             command=self._on_pause,
-            width=10,
+            width=BTN_NORMAL,
         )
+
         self.resume_button = tb.Button(
             btn_row,
-            text="⏵  ทำต่อ",
+            text="▶ ทำต่อ",
             bootstyle="info-outline",
             command=self._on_resume,
-            width=10,
+            width=BTN_NORMAL,
         )
+
         self.cancel_button = tb.Button(
             btn_row,
-            text="⏹  ยกเลิก",
+            text="◼ ยกเลิก",
             bootstyle="danger-outline",
             command=self._on_cancel,
-            width=10,
+            width=BTN_NORMAL,
         )
-        for i, btn in enumerate(
-            (
-                self.start_button,
-                self.pause_button,
-                self.resume_button,
-                self.cancel_button,
-            )
-        ):
-            btn.pack(side=LEFT, padx=(0 if i == 0 else 8, 0))
+
+        buttons = (
+            self.start_selected_button,
+            self.start_button,
+            self.pause_button,
+            self.resume_button,
+            self.cancel_button,
+        )
+
+        for btn in buttons:
+            btn.pack(side=LEFT, padx=4, pady=2)
 
     def _open_selected_emulator(self) -> None:
         """เปิด Emulator ที่เลือก"""
@@ -731,7 +756,6 @@ class BotApp(tb.Window):
             self.control.stop()
 
         # เริ่มใหม่เฉพาะจอที่เลือก
-        self.stats.reset()
         self.control.reset()
 
         def _notify_finished():
@@ -746,6 +770,7 @@ class BotApp(tb.Window):
             on_finished=_notify_finished,
             mode=self.current_mode.get(),
             found_queue=self.found_queue,
+            discord=self.discord,
         )
         self.worker.start()
         self._set_status_running()
@@ -759,7 +784,6 @@ class BotApp(tb.Window):
         if self.worker and self.worker.is_alive():
             self.control.stop()
 
-        self.stats.reset()
         self.control.reset()
 
         def _notify_finished():
@@ -774,6 +798,7 @@ class BotApp(tb.Window):
             on_finished=_notify_finished,
             mode=self.current_mode.get(),
             found_queue=self.found_queue,
+            discord=self.discord,
         )
         self.worker.start()
         self._set_status_running()
@@ -784,7 +809,6 @@ class BotApp(tb.Window):
             messagebox.showwarning("แจ้งเตือน", "กรุณาเลือกจออย่างน้อย 1 จอ")
             return
 
-        self.stats.reset()
         self.control.reset()
 
         def _notify_finished():
@@ -799,6 +823,7 @@ class BotApp(tb.Window):
             on_finished=_notify_finished,
             mode=self.current_mode.get(),
             found_queue=self.found_queue,
+            discord=self.discord,
         )
         self.worker.start()
         self._set_status_running()
@@ -1011,7 +1036,6 @@ class BotApp(tb.Window):
         )
         self.scan_button.configure(state="normal", text="🔍 สแกนหาจอ")
 
-
     def _on_select_all(self) -> None:
         if not self.instance_vars:
             return
@@ -1067,7 +1091,9 @@ class BotApp(tb.Window):
         cfg.set("reroll.enable_pet_luxury", bool(self.reroll_pet_var.get()))
         cfg.set("telegram.bot_token", self.telegram_bot_token_var.get())
         cfg.set("telegram.chat_id", self.telegram_chat_id_var.get())
-        cfg.set("discord.webhook_url", self.discord_webhook_var.get())  # ← เพิ่ม
+        cfg.set("discord.found_webhook_url",self.discord_found_webhook_var.get())
+        cfg.set("discord.status_webhook_url",self.discord_status_webhook_var.get())
+        cfg.set("discord.error_webhook_url",self.discord_error_webhook_var.get())
         try:
             cfg.save()
         except Exception:
@@ -1093,14 +1119,33 @@ class BotApp(tb.Window):
         selected = self._selected_instances()
         self._save_settings_to_config()
 
-        self.stats.reset()
         self.stats.set_target(
             int(self.target_count_var.get()) if mode == "referral" else 0
         )
         self.control.reset()
-
-        def _notify_finished() -> None:
+        
+        def _notify_finished():
             self.after(0, self._on_worker_finished)
+
+        self.worker = AutomationWorker(
+            config=self.config_obj,
+            instances=self.instances,      # ← ทุกจอ
+            stats=self.stats,
+            control=self.control,
+            recorder=self.recorder,
+            on_finished=_notify_finished,
+            mode=mode,
+            found_queue=self.found_queue,
+            discord=self.discord,
+        )
+
+        self.worker.start()
+        self._set_status_running()
+
+        log.info("เริ่มทำงานทุกจอ (%d จอ)", len(self.instances))
+
+    def _notify_finished() -> None:
+        self.after(0, self._on_worker_finished)
 
         self.worker = AutomationWorker(
             config=self.config_obj,
@@ -1111,6 +1156,7 @@ class BotApp(tb.Window):
             on_finished=_notify_finished,
             mode=mode,
             found_queue=self.found_queue,
+            discord=self.discord,
         )
         self.worker.start()
         self._set_status_running()

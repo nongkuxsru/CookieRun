@@ -19,6 +19,7 @@ from src.core.logger import get_logger
 from src.data.recorder import Recorder
 from datetime import datetime
 from pathlib import Path
+from src.notification.discord_manager import DiscordManager
 
 log = get_logger(__name__)
 
@@ -101,6 +102,7 @@ class PetRerollController:
         logout_controller: AccountLogoutController | None = None,
         max_hatches: int = _UNLIMITED_HATCH_CAP,
         control=None,
+        discord: DiscordManager | None = None,
     ):
         self.adb = adb
         self.runner = runner
@@ -114,6 +116,7 @@ class PetRerollController:
         self.logout_controller = logout_controller
         self.max_hatches = max_hatches
         self.control = control
+        self.discord = discord
 
     def _template_path(self, rel: str) -> Path:
         return self.runner.templates_root / rel
@@ -312,15 +315,15 @@ class PetRerollController:
             
             # === แจ้ง Discord ===
             try:
-                from src.notification.discord_notifier import DiscordNotifier
-                discord = DiscordNotifier(self.config.get("discord.webhook_url", ""))
                 screenshot = f"logs/found_pet_{account_id}.png"
-                
-                discord.send_found_account(
-                    account_id=account_id,
-                    target_item=f"{self.target_pet_key} + Treasure",
-                    screenshot_path=screenshot
-                )
+
+                if self.discord:
+                    self.discord.found.send_found_account(
+                        account_id=account_id,
+                        target_item=f"{self.target_pet_key} + Treasure",
+                        screenshot_path=screenshot,
+                    )
+
             except Exception as e:
                 log.warning(f"ส่ง Discord ล้มเหลว: {e}")
 

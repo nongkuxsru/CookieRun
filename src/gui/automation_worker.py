@@ -31,7 +31,8 @@ from src.core.emulator_scanner import EmulatorInstance
 from src.core.exceptions import AutomationBaseError, AutomationCancelled
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
-from src.emulator.emulator_controller import EmulatorController   # ← เพิ่มบรรทัดนี้
+from src.emulator.emulator_controller import EmulatorController   # ← เพิ่มบรรทัดนี้\
+from src.notification.discord_manager import DiscordManager
 
 log = get_logger(__name__)
 
@@ -52,6 +53,8 @@ class AutomationWorker:
         on_finished: Callable[[], None],
         mode: Mode = "reroll",
         found_queue: "queue.Queue[str] | None" = None,
+        discord: DiscordManager | None = None,
+        
     ):
         self.config = config
         self.instances = instances
@@ -62,6 +65,8 @@ class AutomationWorker:
         self.mode = mode
         self.found_queue = found_queue
         self._threads: list[threading.Thread] = []
+        self.discord = discord
+
 
     def start(self) -> None:
         target_fn = (
@@ -255,6 +260,7 @@ class AutomationWorker:
                 logout_controller=logout_controller,   # ← เพิ่มบรรทัดนี้
                 max_hatches=max_hatches,
                 control=self.control,
+                discord=self.discord,   # ← ต้องเพิ่ม
             )
 
             treasure_controller = TreasureRerollController(
@@ -321,3 +327,12 @@ class AutomationWorker:
             log.exception(f"[{tag}] ERROR ใหญ่เกิดขึ้น: {e}")
         finally:
             log.info(f"[{tag}] จบการทำงานของ instance นี้")
+            
+            # === แจ้ง Discord เมื่อจบ instance ===
+            try:
+                self.discord.status.send_message(
+                    f"**[{tag}]** จบการทำงานของ instance นี้\n"
+                    f"สถานะ: {outcome}"
+                )
+            except Exception as e:
+                log.warning(f"ส่ง Discord ล้มเหลว: {e}")
