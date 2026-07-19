@@ -27,43 +27,6 @@ VICTOR_TEMPLATE = "treasure_reroll/Victor_Feather_Laurel_Wreath.png"
 BANANA_TEMPLATE = "treasure_reroll/Dropped_Banana_Peel.png"
 COIN_TEMPLATE = "treasure_reroll/coin_wallet.png"
 
-def target_treasure_template(target_key: str) -> str:
-    return f"treasure_reroll/{target_key}.png"
-
-
-def build_enter_treasure_step() -> Step:
-    return button_step(
-        "treasure_enter",
-        "treasure_reroll/enter_treasure.png",
-        timeout=20.0,
-    )
-
-
-def build_draw_step() -> Step:
-    return button_step(
-        "treasure_draw",
-        "treasure_reroll/draw_treasure.png",
-        post_delay=0.5,
-    )
-
-
-def build_click_free_step() -> Step:
-    return button_step(
-        "treasure_click_free",
-        "treasure_reroll/click_free_treasure.png",
-        post_delay=0.3,
-        on_missing="skip",  # สำคัญ: ถ้าไม่เจอจะข้ามและเช็คสถานะ
-    )
-
-
-def build_skip_treasure_step() -> Step:
-    return button_step(
-        "treasure_skip",
-        "treasure_reroll/skip_treasure.png",
-        post_delay=0.3,
-        on_missing="skip",
-    )
-
 @dataclass(frozen=True)
 class TreasureTemplate:
     key: str
@@ -212,10 +175,20 @@ class TreasureRerollController:
                 )
 
                 # กดสุ่มฟรี
-                self.runner.run_step(build_click_free_step())
+                self.auto.tap_template(
+                    "treasure_reroll/click_free_treasure.png",
+                    name="treasure_click_free",
+                    post_delay=0.3,
+                    on_missing="skip",
+                )
 
                 # กด Skip ถ้ามี
-                self.runner.run_step(build_skip_treasure_step())
+                self.auto.tap_template(
+                    "treasure_reroll/skip_treasure.png",
+                    name="treasure_skip",
+                    post_delay=0.3,
+                    on_missing="skip",
+                )
 
                 # === แก้ไขใหม่: รอ + ตรวจซ้ำหลายครั้ง ===
                 log.info("รอภาพสมบัติโผล่...")
@@ -233,8 +206,16 @@ class TreasureRerollController:
 
     def _prepare_draw(self) -> None:
         """Open treasure draw screen."""
-        self.runner.run_step(build_enter_treasure_step())
-        self.runner.run_step(build_draw_step())
+        self.auto.tap_template(
+            "treasure_reroll/enter_treasure.png",
+            name="treasure_enter",
+            timeout=20.0,
+        )
+        self.auto.tap_template(
+            "treasure_reroll/draw_treasure.png",
+            name="treasure_draw",
+            post_delay=0.5,
+        )
 
     def run(self, account_id: str | None) -> str:
         """Draw treasures until target found or tickets exhausted.
@@ -242,13 +223,6 @@ class TreasureRerollController:
         """
         if self.control:
             self.control.check()
-
-        target_tpl = target_treasure_template(self.target_treasure_key)
-        if not self.auto.exists(target_tpl):
-            log.warning(
-                "ยังไม่มี template สมบัติเป้าหมาย: %s (จะสุ่มต่อไปจนหมดตั๋ว)",
-                target_tpl,
-            )
 
         log.info("เริ่มสุ่มสมบัติ (account_id=%s)...", account_id)
         found_treasures = {

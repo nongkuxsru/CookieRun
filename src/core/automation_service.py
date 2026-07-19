@@ -50,3 +50,22 @@ class AutomationService:
 
         self.tap(template, name)
         return True
+        
+    def tap_template(
+        self,
+        template: str,
+        *,
+        name: str | None = None,
+        timeout: float = 15.0,
+        post_delay: float = 0.8,
+        on_missing: str = "raise",
+    ):
+        return self.runner.run_step(
+            button_step(
+                name or template,
+                template,
+                timeout=timeout,
+                post_delay=post_delay,
+                on_missing=on_missing,
+            )
+        )
