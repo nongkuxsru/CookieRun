@@ -12,6 +12,7 @@ from src.core.adb_client import AdbClient
 from src.core.image_service import ImageService
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
+from src.services.treasure_result_service import TreasureResultService
 
 
 log = get_logger(__name__)
@@ -110,6 +111,7 @@ class TreasureRerollController:
         self.target_treasure_key = target_treasure_key
         self.max_draws = max_draws
         self.draw_delay = draw_delay
+        self.result_service = TreasureResultService()
 
     def _close_treasure_bag(self) -> None:
         self.image.tap("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
@@ -150,21 +152,13 @@ class TreasureRerollController:
                     found_treasures[treasure.key],
                 )
 
-    def _log_summary(self, found_treasures: dict[str, int]) -> None:
-        log.info("========== Treasure Summary ==========")
-        log.info("Victor      : %d", found_treasures["victor"])
-        log.info("Banana      : %d", found_treasures["banana"])
-        log.info("Coin Wallet : %d", found_treasures["coin"])
-        log.info("======================================")
-
     def _finish_result(
         self,
         account_id: str | None,
         found_treasures: dict[str, int],
     ) -> str:
-
-        self._log_summary(found_treasures)
-
+        self.result_service.log_summary(found_treasures)
+        
         if found_treasures["victor"] > 0:
 
             if account_id:
