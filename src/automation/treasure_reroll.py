@@ -150,6 +150,58 @@ class TreasureRerollController:
                     found_treasures[treasure.key],
                 )
 
+    def _log_summary(self, found_treasures: dict[str, int]) -> None:
+        log.info("========== Treasure Summary ==========")
+        log.info("Victor      : %d", found_treasures["victor"])
+        log.info("Banana      : %d", found_treasures["banana"])
+        log.info("Coin Wallet : %d", found_treasures["coin"])
+        log.info("======================================")
+
+    def _finish_result(
+        self,
+        account_id: str | None,
+        found_treasures: dict[str, int],
+    ) -> str:
+
+        self._log_summary(found_treasures)
+
+        if found_treasures["victor"] > 0:
+
+            if account_id:
+                self.recorder.record_found_pet(
+                    account_id,
+                    self.target_treasure_key,
+                    f"logs/found_treasure_{account_id}.png",
+                    note=(
+                        f"Victor x{found_treasures['victor']} | "
+                        f"Banana x{found_treasures['banana']} | "
+                        f"Coin x{found_treasures['coin']}"
+                    ),
+                    treasures=(
+                        f"Victor={found_treasures['victor']}, "
+                        f"Banana={found_treasures['banana']}, "
+                        f"Coin={found_treasures['coin']}"
+                    ),
+                )
+
+            self._close_found(account_id or "unknown")
+
+            return "found"
+
+        self.recorder.record_failed_account(
+            account_id,
+            reason=(
+                f"Treasure Result : "
+                f"Victor={found_treasures['victor']} "
+                f"Banana={found_treasures['banana']} "
+                f"Coin={found_treasures['coin']}"
+            ),
+        )
+
+        self._close_not_found()
+
+        return "not_found"
+
     def run(self, account_id: str | None) -> str:
         """Draw treasures until target found or tickets exhausted.
         Returns "found" or "not_found".
@@ -186,47 +238,10 @@ class TreasureRerollController:
                 button_step("check_ticket_empty", _TICKET_LEFT, timeout=0, on_missing="skip")
             )
             if ticket_found:
-
-                log.info("========== Treasure Summary ==========")
-                log.info("Victor : %d", found_treasures["victor"])
-                log.info("Banana : %d", found_treasures["banana"])
-                log.info("Coin Wallet   : %d", found_treasures["coin"])
-                log.info("=====================================")
-
-                if found_treasures["victor"] > 0:
-
-                    if account_id:
-                        self.recorder.record_found_pet(
-                            account_id,
-                            self.target_treasure_key,
-                            f"logs/found_treasure_{account_id}.png",
-                            note=f"Victor x{found_treasures['victor']} | "
-                                f"Banana x{found_treasures['banana']} | "
-                                f"Coin x{found_treasures['coin']}",
-                            treasures=(
-                                f"Victor={found_treasures['victor']}, "
-                                f"Banana={found_treasures['banana']}, "
-                                f"Coin={found_treasures['coin']}"
-                            ),
-                        )
-
-                    self._close_found(account_id or "unknown")
-
-                    return "found"
-
-                self.recorder.record_failed_account(
+                return self._finish_result(
                     account_id,
-                    reason=(
-                        f"Treasure Result : "
-                        f"Victor={found_treasures['victor']} "
-                        f"Banana={found_treasures['banana']} "
-                        f"Coin={found_treasures['coin']}"
-                    ),
+                    found_treasures,
                 )
-
-                self._close_not_found()
-
-                return "not_found"
 
             log.info(
                 "สรุปรอบ %d : Victor=%d Banana=%d Coin=%d",
