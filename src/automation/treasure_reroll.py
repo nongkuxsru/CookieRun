@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
 from src.automation.flow_steps import button_step
 from src.automation.state_machine import StepRunner
 from src.automation.steps import Step
 from src.core.adb_client import AdbClient
-from src.core.image_matcher import MatchResult, find_any_template
+from src.core.image_service import ImageService
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
-from src.core.image_service import ImageService
 
 log = get_logger(__name__)
 
@@ -81,34 +79,6 @@ class TreasureRerollController:
         self.target_treasure_key = target_treasure_key
         self.max_draws = max_draws
         self.draw_delay = draw_delay
-        
-
-    def _template_path(self, rel: str) -> Path:
-        return self.runner.templates_root / rel
-
-    def _template_exists(self, rel: str) -> bool:
-        return self._template_path(rel).exists()
-
-    def _match(self, *template_rels: str) -> tuple[str | None, MatchResult]:
-        screenshot = self.adb.screenshot()
-        paths = [self._template_path(r) for r in template_rels if self._template_exists(r)]
-        if not paths:
-            return None, MatchResult(
-                found=False, confidence=0.0, center=None, top_left=None, size=None
-            )
-        matched_path, result = find_any_template(
-            screenshot,
-            paths,
-            threshold=self.runner.default_threshold,
-            scales=self.runner.default_scales,
-        )
-        if result.found and matched_path:
-            rel = str(Path(matched_path).relative_to(self.runner.templates_root)).replace("\\", "/")
-            return rel, result
-        return None, result
-
-    def _tap_template(self, template_rel: str, name: str) -> None:
-        self.runner.run_step(button_step(name, template_rel, on_missing="skip"))
 
     def _close_treasure_bag(self) -> None:
         self.image.tap("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
@@ -222,7 +192,7 @@ class TreasureRerollController:
             )
 
             # กดสุ่มฟรี
-            free_result = self.runner.run_step(build_click_free_step())
+            self.runner.run_step(build_click_free_step())
 
             # กด Skip ถ้ามี
             self.runner.run_step(build_skip_treasure_step())
@@ -232,7 +202,7 @@ class TreasureRerollController:
             time.sleep(self.draw_delay)
 
             # ---------- ตรวจสมบัติที่สุ่มได้ ----------
-            _, result = self.image.match(VICTOR_TEMPLATE)
+            _, victor_result = self.image.match(VICTOR_TEMPLATE)
 
             if victor_result.found:
                 found_treasures["victor"] += 1
@@ -242,7 +212,7 @@ class TreasureRerollController:
                 )
 
 
-            _, result = self.image.match(BANANA_TEMPLATE)
+            _, banana_result = self.image.match(BANANA_TEMPLATE)
 
             if banana_result.found:
                 found_treasures["banana"] += 1
@@ -251,7 +221,7 @@ class TreasureRerollController:
                     found_treasures["banana"],
                 )
 
-            _, result = self.image.match(COIN_TEMPLATE)
+            _, coin_result = self.image.match(COIN_TEMPLATE)
 
             if coin_result.found:
                 found_treasures["coin"] += 1
