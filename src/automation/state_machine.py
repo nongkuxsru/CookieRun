@@ -154,12 +154,12 @@ class StepRunner:
             if attempt < self.step_retry_count:
                 time.sleep(self.step_retry_delay)
 
+        if step.on_missing == "skip":
+            log.warning("[%s] ข้ามขั้นตอนนี้ไปตามที่กำหนด", step.name)
+            return last_result
+
         if last_screenshot is not None:
             self._save_error_screenshot(step, last_screenshot)
-
-        if step.on_missing == "skip":
-            log.warning("[%s] ข้ามขั้นตอนนี้ไปตามที่กำหนด (on_missing=skip)", step.name)
-            return last_result
 
         message = f"ไม่สามารถยืนยันขั้นตอน '{step.name}' ได้ (confidence สูงสุด={last_result.confidence:.3f})"
         if step.on_missing == "raise":

@@ -20,7 +20,9 @@ _SKIP_TREASURE = "treasure_reroll/skip_treasure.png"
 _CLOSE_POPUP_NEWTREASURE = "treasure_reroll/close_popup_newtreasure.png"
 _DRAW_ANIMATION_DELAY = 1.5
 _DEFAULT_MAX_DRAWS = 6
-
+VICTOR_TEMPLATE = "treasure_reroll/Victor_Feather_Laurel_Wreath.png"
+BANANA_TEMPLATE = "treasure_reroll/Dropped_Banana_Peel.png"
+COIN_TEMPLATE = "treasure_reroll/coin_wallet.png"
 
 def target_treasure_template(target_key: str) -> str:
     return f"treasure_reroll/{target_key}.png"
@@ -121,7 +123,6 @@ class TreasureRerollController:
     def _close_found(self, account_id: str) -> None:
         """ปิดและบันทึกเมื่อเจอสมบัติเป้าหมาย"""
     
-        self._close_popup_new_treasure()
         self._tap_template("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
         self._tap_template("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
 
@@ -147,6 +148,11 @@ class TreasureRerollController:
             )
 
         log.info("เริ่มสุ่มสมบัติ (account_id=%s)...", account_id)
+        found_treasures = {
+            "victor": 0,
+            "banana": 0,
+            "coin": 0,
+        }
         
         # เข้าหน้าเมนูสมบัติ
         self.runner.run_step(build_enter_treasure_step())
@@ -163,14 +169,55 @@ class TreasureRerollController:
                 button_step("check_ticket_empty", _TICKET_LEFT, timeout=0, on_missing="skip")
             )
             if ticket_found:
-                log.info("ตั๋วหมดแล้ว (รอบสุ่มที่ %d)", draw_num)
+
+                log.info("========== Treasure Summary ==========")
+                log.info("Victor : %d", found_treasures["victor"])
+                log.info("Banana : %d", found_treasures["banana"])
+                log.info("Coin Wallet   : %d", found_treasures["coin"])
+                log.info("=====================================")
+
+                if found_treasures["victor"] > 0:
+
+                    if account_id:
+                        self.recorder.record_found_pet(
+                            account_id,
+                            self.target_treasure_key,
+                            f"logs/found_treasure_{account_id}.png",
+                            note=f"Victor x{found_treasures['victor']} | "
+                                f"Banana x{found_treasures['banana']} | "
+                                f"Coin x{found_treasures['coin']}",
+                            treasures=(
+                                f"Victor={found_treasures['victor']}, "
+                                f"Banana={found_treasures['banana']}, "
+                                f"Coin={found_treasures['coin']}"
+                            ),
+                        )
+
+                    self._close_found(account_id or "unknown")
+
+                    return "found"
+
                 self.recorder.record_failed_account(
-                    account_id, reason=f"ตั๋วหมด (treasure #{draw_num})"
+                    account_id,
+                    reason=(
+                        f"Treasure Result : "
+                        f"Victor={found_treasures['victor']} "
+                        f"Banana={found_treasures['banana']} "
+                        f"Coin={found_treasures['coin']}"
+                    ),
                 )
+
                 self._close_not_found()
+
                 return "not_found"
 
-            log.info("รอบสุ่มที่ %d", draw_num)
+            log.info(
+                "สรุปรอบ %d : Victor=%d Banana=%d Coin=%d",
+                draw_num,
+                found_treasures["victor"],
+                found_treasures["banana"],
+                found_treasures["coin"],
+            )
 
             # กดสุ่มฟรี
             free_result = self.runner.run_step(build_click_free_step())
@@ -182,24 +229,35 @@ class TreasureRerollController:
             log.info("รอภาพสมบัติโผล่...")
             time.sleep(self.draw_delay)
 
-            # ตรวจสอบของที่ได้
-            if self._template_exists(target_tpl):
-                _, target_result = self._match(target_tpl)
+            # ---------- ตรวจสมบัติที่สุ่มได้ ----------
+            _, victor_result = self._match(VICTOR_TEMPLATE)
 
-                if target_result.found:
-                    log.info("เจอสมบัติเป้าหมาย (รอบ %d)", draw_num)
+            if victor_result.found:
+                found_treasures["victor"] += 1
+                log.info(
+                    "🎉 พบ Victor Feather Laurel Wreath (%d)",
+                    found_treasures["victor"],
+                )
 
-                    if account_id:
-                        self.recorder.record_found_pet(
-                            account_id,
-                            self.target_treasure_key,
-                            f"logs/found_treasure_{account_id}.png",
-                            note=f"treasure draw #{draw_num}",
-                            treasures=self.target_treasure_key   # ← เพิ่ม
-                        )
 
-                    self._close_found(account_id or "unknown")
-                    return "found"
+            _, banana_result = self._match(BANANA_TEMPLATE)
+
+            if banana_result.found:
+                found_treasures["banana"] += 1
+                log.info(
+                    "🍌 พบ Dropped Banana Peel (%d)",
+                    found_treasures["banana"],
+                )
+
+
+            _, coin_result = self._match(COIN_TEMPLATE)
+
+            if coin_result.found:
+                found_treasures["coin"] += 1
+                log.info(
+                    "🪙 พบ Coin Wallet (%d)",
+                    found_treasures["coin"],
+                )
 
             log.info("ไม่เจอสมบัติเป้าหมาย สุ่มรอบถัดไป")
 
