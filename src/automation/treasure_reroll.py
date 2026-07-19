@@ -111,7 +111,7 @@ class TreasureRerollController:
         self.target_treasure_key = target_treasure_key
         self.max_draws = max_draws
         self.draw_delay = draw_delay
-        self.result_service = TreasureResultService()
+        self.result_service = TreasureResultService(recorder)
 
     def _close_treasure_bag(self) -> None:
         self.image.tap("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
@@ -158,38 +158,23 @@ class TreasureRerollController:
         found_treasures: dict[str, int],
     ) -> str:
         self.result_service.log_summary(found_treasures)
-        
+
         if found_treasures["victor"] > 0:
 
             if account_id:
-                self.recorder.record_found_pet(
+                self.result_service.record_success(
                     account_id,
                     self.target_treasure_key,
-                    f"logs/found_treasure_{account_id}.png",
-                    note=(
-                        f"Victor x{found_treasures['victor']} | "
-                        f"Banana x{found_treasures['banana']} | "
-                        f"Coin x{found_treasures['coin']}"
-                    ),
-                    treasures=(
-                        f"Victor={found_treasures['victor']}, "
-                        f"Banana={found_treasures['banana']}, "
-                        f"Coin={found_treasures['coin']}"
-                    ),
+                    found_treasures,
                 )
 
             self._close_found(account_id or "unknown")
 
             return "found"
 
-        self.recorder.record_failed_account(
+        self.result_service.record_failed(
             account_id,
-            reason=(
-                f"Treasure Result : "
-                f"Victor={found_treasures['victor']} "
-                f"Banana={found_treasures['banana']} "
-                f"Coin={found_treasures['coin']}"
-            ),
+            found_treasures,
         )
 
         self._close_not_found()
