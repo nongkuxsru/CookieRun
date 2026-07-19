@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 
 from src.automation.flow_steps import button_step
 from src.automation.state_machine import StepRunner
@@ -11,6 +12,7 @@ from src.core.adb_client import AdbClient
 from src.core.image_service import ImageService
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
+
 
 log = get_logger(__name__)
 
@@ -60,6 +62,35 @@ def build_skip_treasure_step() -> Step:
         on_missing="skip",
     )
 
+@dataclass(frozen=True)
+class TreasureTemplate:
+    key: str
+    template: str
+    display_name: str
+    icon: str
+
+
+TREASURE_TARGETS = (
+    TreasureTemplate(
+        "victor",
+        VICTOR_TEMPLATE,
+        "Victor Feather Laurel Wreath",
+        "🎉",
+    ),
+    TreasureTemplate(
+        "banana",
+        BANANA_TEMPLATE,
+        "Dropped Banana Peel",
+        "🍌",
+    ),
+    TreasureTemplate(
+        "coin",
+        COIN_TEMPLATE,
+        "Coin Wallet",
+        "🪙",
+    ),
+)
+
 
 class TreasureRerollController:
     def __init__(
@@ -104,6 +135,20 @@ class TreasureRerollController:
         
         self.image.tap("treasure_reroll/close_treasure_cabinet.png", "treasure_close_cabinet")
         self._close_treasure_bag()
+    
+    def _detect_treasures(self, found_treasures):
+        for treasure in TREASURE_TARGETS:
+            _, result = self.image.match(treasure.template)
+
+            if result.found:
+                found_treasures[treasure.key] += 1
+
+                log.info(
+                    "%s พบ %s (%d)",
+                    treasure.icon,
+                    treasure.display_name,
+                    found_treasures[treasure.key],
+                )
 
     def run(self, account_id: str | None) -> str:
         """Draw treasures until target found or tickets exhausted.
@@ -202,33 +247,7 @@ class TreasureRerollController:
             time.sleep(self.draw_delay)
 
             # ---------- ตรวจสมบัติที่สุ่มได้ ----------
-            _, victor_result = self.image.match(VICTOR_TEMPLATE)
-
-            if victor_result.found:
-                found_treasures["victor"] += 1
-                log.info(
-                    "🎉 พบ Victor Feather Laurel Wreath (%d)",
-                    found_treasures["victor"],
-                )
-
-
-            _, banana_result = self.image.match(BANANA_TEMPLATE)
-
-            if banana_result.found:
-                found_treasures["banana"] += 1
-                log.info(
-                    "🍌 พบ Dropped Banana Peel (%d)",
-                    found_treasures["banana"],
-                )
-
-            _, coin_result = self.image.match(COIN_TEMPLATE)
-
-            if coin_result.found:
-                found_treasures["coin"] += 1
-                log.info(
-                    "🪙 พบ Coin Wallet (%d)",
-                    found_treasures["coin"],
-                )
+            self._detect_treasures(found_treasures)
 
             log.info("ไม่เจอสมบัติเป้าหมาย สุ่มรอบถัดไป")
 
