@@ -250,6 +250,11 @@ class TreasureRerollController:
         log.info("หมดรอบสุ่มสมบัติ %d รอบ", self.max_draws)
         return "not_found"
 
+    def _prepare_draw(self) -> None:
+        """Open treasure draw screen."""
+        self.runner.run_step(build_enter_treasure_step())
+        self.runner.run_step(build_draw_step())
+
     def run(self, account_id: str | None) -> str:
         """Draw treasures until target found or tickets exhausted.
         Returns "found" or "not_found".
@@ -271,11 +276,7 @@ class TreasureRerollController:
             "coin": 0,
         }
         
-        # เข้าหน้าเมนูสมบัติ
-        self.runner.run_step(build_enter_treasure_step())
-        
-        # เปิดหน้าต่างสุ่มสมบัติ (ทำครั้งเดียว)
-        self.runner.run_step(build_draw_step())
+        self._prepare_draw()
 
         result = self._draw_loop(
             account_id,
