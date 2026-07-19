@@ -202,6 +202,54 @@ class TreasureRerollController:
 
         return "not_found"
 
+    def _draw_loop(
+        self,
+        account_id: str | None,
+        found_treasures: dict[str, int],
+    ) -> str | None:
+
+        for draw_num in range(1, self.max_draws + 1):
+                if self.control:
+                    self.control.check()
+
+                # ── เช็คตั๋วหมดก่อน ──
+                ticket_found, _ = self.runner.try_step_once(
+                    button_step("check_ticket_empty", _TICKET_LEFT, timeout=0, on_missing="skip")
+                )
+                if ticket_found:
+                    return self._finish_result(
+                        account_id,
+                        found_treasures,
+                    )
+
+                log.info(
+                    "สรุปรอบ %d : Victor=%d Banana=%d Coin=%d",
+                    draw_num,
+                    found_treasures["victor"],
+                    found_treasures["banana"],
+                    found_treasures["coin"],
+                )
+
+                # กดสุ่มฟรี
+                self.runner.run_step(build_click_free_step())
+
+                # กด Skip ถ้ามี
+                self.runner.run_step(build_skip_treasure_step())
+
+                # === แก้ไขใหม่: รอ + ตรวจซ้ำหลายครั้ง ===
+                log.info("รอภาพสมบัติโผล่...")
+                time.sleep(self.draw_delay)
+
+                # ---------- ตรวจสมบัติที่สุ่มได้ ----------
+                self._detect_treasures(found_treasures)
+
+                log.info("ไม่เจอสมบัติเป้าหมาย สุ่มรอบถัดไป")
+
+                self._close_popup_new_treasure()
+
+        log.info("หมดรอบสุ่มสมบัติ %d รอบ", self.max_draws)
+        return "not_found"
+
     def run(self, account_id: str | None) -> str:
         """Draw treasures until target found or tickets exhausted.
         Returns "found" or "not_found".
@@ -229,45 +277,13 @@ class TreasureRerollController:
         # เปิดหน้าต่างสุ่มสมบัติ (ทำครั้งเดียว)
         self.runner.run_step(build_draw_step())
 
-        for draw_num in range(1, self.max_draws + 1):
-            if self.control:
-                self.control.check()
+        result = self._draw_loop(
+            account_id,
+            found_treasures,
+        )
 
-            # ── เช็คตั๋วหมดก่อน ──
-            ticket_found, _ = self.runner.try_step_once(
-                button_step("check_ticket_empty", _TICKET_LEFT, timeout=0, on_missing="skip")
-            )
-            if ticket_found:
-                return self._finish_result(
-                    account_id,
-                    found_treasures,
-                )
+        if result:
+            return result
 
-            log.info(
-                "สรุปรอบ %d : Victor=%d Banana=%d Coin=%d",
-                draw_num,
-                found_treasures["victor"],
-                found_treasures["banana"],
-                found_treasures["coin"],
-            )
-
-            # กดสุ่มฟรี
-            self.runner.run_step(build_click_free_step())
-
-            # กด Skip ถ้ามี
-            self.runner.run_step(build_skip_treasure_step())
-
-            # === แก้ไขใหม่: รอ + ตรวจซ้ำหลายครั้ง ===
-            log.info("รอภาพสมบัติโผล่...")
-            time.sleep(self.draw_delay)
-
-            # ---------- ตรวจสมบัติที่สุ่มได้ ----------
-            self._detect_treasures(found_treasures)
-
-            log.info("ไม่เจอสมบัติเป้าหมาย สุ่มรอบถัดไป")
-
-            self._close_popup_new_treasure()
-
-        log.info("หมดรอบสุ่มสมบัติ %d รอบ", self.max_draws)
         return "not_found"
         
