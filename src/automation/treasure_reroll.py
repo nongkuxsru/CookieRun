@@ -12,6 +12,7 @@ from src.core.adb_client import AdbClient
 from src.core.image_matcher import MatchResult, find_any_template
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
+from src.core.image_service import ImageService
 
 log = get_logger(__name__)
 
@@ -75,11 +76,12 @@ class TreasureRerollController:
     ):
         self.adb = adb
         self.runner = runner
+        self.image = ImageService(adb, runner)
         self.recorder = recorder
         self.target_treasure_key = target_treasure_key
         self.max_draws = max_draws
         self.draw_delay = draw_delay
-        self.control = control
+        
 
     def _template_path(self, rel: str) -> Path:
         return self.runner.templates_root / rel
@@ -109,28 +111,28 @@ class TreasureRerollController:
         self.runner.run_step(button_step(name, template_rel, on_missing="skip"))
 
     def _close_treasure_bag(self) -> None:
-        self._tap_template("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
+        self.image.tap("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
 
     def _close_not_found(self) -> None:
         """ปิดเมื่อหมดตั๋วหรือไม่เจอสมบัติ"""
-        self._tap_template("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
+        self.image.tap("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
         self._close_treasure_bag()
 
     def _close_popup_new_treasure(self) -> None:
-        self._tap_template(_CLOSE_POPUP_NEWTREASURE, "treasure_close_popup_new")
+        self.image.tap(_CLOSE_POPUP_NEWTREASURE, "treasure_close_popup_new")
         time.sleep(0.5)
 
     def _close_found(self, account_id: str) -> None:
         """ปิดและบันทึกเมื่อเจอสมบัติเป้าหมาย"""
     
-        self._tap_template("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
-        self._tap_template("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
+        self.image.tap("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
+        self.image.tap("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
 
         screenshot_path = f"logs/found_treasure_{account_id}.png"
         self.adb.save_screenshot(screenshot_path)
         log.info("บันทึกภาพกระเป๋าสมบัติไว้ที่ %s", screenshot_path)
         
-        self._tap_template("treasure_reroll/close_treasure_cabinet.png", "treasure_close_cabinet")
+        self.image.tap("treasure_reroll/close_treasure_cabinet.png", "treasure_close_cabinet")
         self._close_treasure_bag()
 
     def run(self, account_id: str | None) -> str:
@@ -141,7 +143,7 @@ class TreasureRerollController:
             self.control.check()
 
         target_tpl = target_treasure_template(self.target_treasure_key)
-        if not self._template_exists(target_tpl):
+        if not self.image.exists(target_tpl):
             log.warning(
                 "ยังไม่มี template สมบัติเป้าหมาย: %s (จะสุ่มต่อไปจนหมดตั๋ว)",
                 target_tpl,
@@ -230,7 +232,7 @@ class TreasureRerollController:
             time.sleep(self.draw_delay)
 
             # ---------- ตรวจสมบัติที่สุ่มได้ ----------
-            _, victor_result = self._match(VICTOR_TEMPLATE)
+            _, result = self.image.match(VICTOR_TEMPLATE)
 
             if victor_result.found:
                 found_treasures["victor"] += 1
@@ -240,7 +242,7 @@ class TreasureRerollController:
                 )
 
 
-            _, banana_result = self._match(BANANA_TEMPLATE)
+            _, result = self.image.match(BANANA_TEMPLATE)
 
             if banana_result.found:
                 found_treasures["banana"] += 1
@@ -249,8 +251,7 @@ class TreasureRerollController:
                     found_treasures["banana"],
                 )
 
-
-            _, coin_result = self._match(COIN_TEMPLATE)
+            _, result = self.image.match(COIN_TEMPLATE)
 
             if coin_result.found:
                 found_treasures["coin"] += 1
