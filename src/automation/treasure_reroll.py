@@ -77,6 +77,7 @@ class TreasureRerollController:
         self.draw_delay = draw_delay
         self.result_service = TreasureResultService(recorder)
         self.auto = AutomationService(adb, runner)
+        self.control = control
 
     def _close_treasure_bag(self) -> None:
         self.auto.tap("treasure_reroll/close_treasure_bag.png", "treasure_close_bag")
