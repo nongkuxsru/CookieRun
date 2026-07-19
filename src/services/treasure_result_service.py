@@ -55,3 +55,9 @@ class TreasureResultService:
                 f"Coin={found_treasures['coin']}"
             ),
         )
+
+    def has_target(
+        self,
+        found_treasures: dict[str, int],
+    ) -> bool:
+        return found_treasures["victor"] > 0

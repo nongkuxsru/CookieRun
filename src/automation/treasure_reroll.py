@@ -159,7 +159,7 @@ class TreasureRerollController:
     ) -> str:
         self.result_service.log_summary(found_treasures)
 
-        if found_treasures["victor"] > 0:
+        if self.result_service.has_target(found_treasures):
 
             if account_id:
                 self.result_service.record_success(
