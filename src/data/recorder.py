@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
+from src.models.account_info import AccountInfo
 
 
 @dataclass
@@ -38,18 +39,20 @@ class Recorder:
                 csv.writer(f).writerow(header)
 
     def record_found_pet(
-        self, account_id: str, pet_name: str, screenshot: str = "", note: str = "", treasures: str = "" 
+        self,
+        account: AccountInfo,
+        note: str = "",
     ) -> None:
         with self._lock:
             with open(self.found_pets_path, "a", newline="", encoding="utf-8-sig") as f:
                 csv.writer(f).writerow(
                     [
                         datetime.now().isoformat(timespec="seconds"),
-                        account_id,
-                        pet_name,
-                        screenshot,
+                        account.account_id,
+                        account.pet_name or "",
+                        account.pet_image_path or "",
                         note,
-                        treasures
+                        ", ".join(account.treasures),
                     ]
                 )
 

@@ -9,6 +9,7 @@ from pathlib import Path
 import requests
 
 from src.core.logger import get_logger
+from src.models.account_info import AccountInfo
 
 log = get_logger(__name__)
 
@@ -20,22 +21,44 @@ class DiscordNotifier:
 
     def send_found_account(
         self,
-        account_id: str,
-        target_item: str,
-        screenshot_path: str | None = None,
+        account: AccountInfo,
     ):
         """แจ้งเมื่อเจอของดี"""
         if not self.enabled:
             return
 
+        treasure_text = (
+            "\n".join(f"• {t}" for t in account.treasures)
+            if account.treasures
+            else "-"
+        )
+
         embed = {
-            "title": "🎉 เจอของเป้าหมายแล้ว!",
-            "description": (
-                f"**Account ID**: `{account_id}`\n"
-                f"**ของที่ได้**: {target_item}"
-            ),
-            "color": 0x00FF00,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "title": "🎉 Found Target Account",
+            "color": 0x2ECC71,
+            "timestamp": account.found_time.astimezone(timezone.utc).isoformat(),
+            "fields": [
+                {
+                    "name": "📧 Email",
+                    "value": f"`{account.email}`",
+                    "inline": False,
+                },
+                {
+                    "name": "🔑 Password",
+                    "value": f"`{account.password}`",
+                    "inline": False,
+                },
+                {
+                    "name": "🐾 Pet",
+                    "value": account.pet_name or "-",
+                    "inline": True,
+                },
+                {
+                    "name": "💎 Treasure",
+                    "value": treasure_text,
+                    "inline": True,
+                },
+            ],
         }
 
         payload = {
@@ -45,11 +68,14 @@ class DiscordNotifier:
 
         files = None
 
-        if screenshot_path and Path(screenshot_path).exists():
+        if account.screenshot_path and Path(account.screenshot_path).exists():
             files = {
-                "file": open(screenshot_path, "rb")
+                "file": open(account.screenshot_path, "rb")
             }
-            payload["content"] = f"เจอ {target_item}\nAccount: {account_id}"
+            payload["content"] = (
+                f"🎉 {account.email}\n"
+                f"🐾 {account.pet_name}"
+            )
 
         try:
             if files:

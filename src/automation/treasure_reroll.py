@@ -92,13 +92,14 @@ class TreasureRerollController:
         self.auto.tap(_CLOSE_POPUP_NEWTREASURE, "treasure_close_popup_new")
         time.sleep(0.5)
 
-    def _close_found(self, account_id: str) -> None:
+    def _close_found(self, account: AccountInfo,) -> None:
         """ปิดและบันทึกเมื่อเจอสมบัติเป้าหมาย"""
     
         self.auto.tap("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
         self.auto.tap("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
 
-        screenshot_path = f"logs/found_treasure_{account_id}.png"
+        account.screenshot_path = screenshot_path
+        screenshot_path = f"logs/found_treasure_{account.account_id}.png"
         self.adb.save_screenshot(screenshot_path)
         log.info("บันทึกภาพกระเป๋าสมบัติไว้ที่ %s", screenshot_path)
         
@@ -128,14 +129,13 @@ class TreasureRerollController:
 
         if self.result_service.has_target(found_treasures):
 
-            if account_id:
-                self.result_service.record_success(
-                    account.account_id,
-                    self.target_treasure_key,
-                    found_treasures,
-                )
+            self.result_service.record_success(
+                account.account_id,
+                self.target_treasure_key,
+                found_treasures,
+            )
 
-            self._close_found(account.account_id)
+            self._close_found(account)
 
             account.treasures.clear()
 
@@ -150,7 +150,7 @@ class TreasureRerollController:
             return "found"
 
         self.result_service.record_failed(
-            account_id,
+            account.account_id,
             found_treasures,
         )
 
@@ -160,9 +160,9 @@ class TreasureRerollController:
 
     def _draw_loop(
         self,
-        account_id: str | None,
+        account: AccountInfo,
         found_treasures: dict[str, int],
-    ) -> str | None:
+    ):
 
         for draw_num in range(1, self.max_draws + 1):
                 if self.control:
@@ -174,7 +174,7 @@ class TreasureRerollController:
                 )
                 if ticket_found:
                     return self._finish_result(
-                        account_id,
+                        account,
                         found_treasures,
                     )
 
@@ -230,23 +230,21 @@ class TreasureRerollController:
         )
 
     def run(self, account: AccountInfo) -> str:
-        """Draw treasures until target found or tickets exhausted.
-        Returns "found" or "not_found".
-        """
         if self.control:
             self.control.check()
 
-        log.info("เริ่มสุ่มสมบัติ (account_id=%s)...", account.account_id,account.email,)
+        log.info("[%s] เริ่มสุ่มสมบัติ...", account.account_id)
+
         found_treasures = {
             "victor": 0,
             "banana": 0,
             "coin": 0,
         }
-        
+
         self._prepare_draw()
 
         result = self._draw_loop(
-            account_id,
+            account,
             found_treasures,
         )
 

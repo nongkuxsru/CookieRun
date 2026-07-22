@@ -197,9 +197,6 @@ class PetRerollController:
         self._tap_template(_CRYSTALS_LEFT_CLOSE, "pet_crystals_left_close")
         self._close_pet_bag()
 
-    def _current_account_id(self) -> str:
-        return time.strftime("acct_%Y%m%d_%H%M%S")
-
     def hatch_until_result(self, account: AccountInfo) -> str:
         """Returns (\"found\" | \"exhausted\", account_id)."""
         target_tpl = self._resolve_target_template()
@@ -254,15 +251,13 @@ class PetRerollController:
                     self.adb.save_screenshot(screenshot_path)
 
                     account.pet_name = self.target_pet_key
+                    account.screenshot_path = screenshot_path
                     
                     self.recorder.record_found_pet(
-                        account.account_id,
-                        self.target_pet_key,
-                        screenshot_path,
+                        account,
                         note=f"hatch #{hatch_num}",
-                        treasures="",   # หรือใส่ชื่อ treasure ถ้ามี
-                        
                     )
+
                     self._return_to_lobby_after_target_found()
                     return "found", account.account_id
 
@@ -328,11 +323,7 @@ class PetRerollController:
                 screenshot = f"logs/found_pet_{account.account_id}.png"
 
                 if self.discord:
-                    self.discord.found.send_found_account(
-                        account_id=account.account_id,
-                        target_item=f"{self.target_pet_key} + Treasure",
-                        screenshot_path=screenshot,
-                    )
+                    self.discord.found.send_found_account(account)
 
             except Exception as e:
                 log.warning(f"ส่ง Discord ล้มเหลว: {e}")
