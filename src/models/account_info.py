@@ -1,13 +1,17 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+import time
 
 
 @dataclass
 class AccountInfo:
     email: str
     password: str
-    account_id: str
+
+    account_id: str = field(
+        default_factory=lambda: time.strftime("acct_%Y%m%d_%H%M%S")
+    )
 
     pet_name: Optional[str] = None
     treasures: List[str] = field(default_factory=list)

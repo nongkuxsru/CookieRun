@@ -14,6 +14,7 @@ from src.core.logger import get_logger
 from src.data.recorder import Recorder
 from src.services.treasure_result_service import TreasureResultService
 from src.core.automation_service import AutomationService
+from src.models.account_info import AccountInfo
 
 
 log = get_logger(__name__)
@@ -120,7 +121,7 @@ class TreasureRerollController:
 
     def _finish_result(
         self,
-        account_id: str | None,
+        account: AccountInfo,
         found_treasures: dict[str, int],
     ) -> str:
         self.result_service.log_summary(found_treasures)
@@ -129,12 +130,22 @@ class TreasureRerollController:
 
             if account_id:
                 self.result_service.record_success(
-                    account_id,
+                    account.account_id,
                     self.target_treasure_key,
                     found_treasures,
                 )
 
-            self._close_found(account_id or "unknown")
+            self._close_found(account.account_id)
+
+            account.treasures.clear()
+
+            for key, count in found_treasures.items():
+                if count > 0:
+                    treasure = next(
+                        t for t in TREASURE_TARGETS
+                        if t.key == key
+                    )
+                    account.treasures.append(treasure.display_name)
 
             return "found"
 
@@ -218,14 +229,14 @@ class TreasureRerollController:
             post_delay=0.5,
         )
 
-    def run(self, account_id: str | None) -> str:
+    def run(self, account: AccountInfo) -> str:
         """Draw treasures until target found or tickets exhausted.
         Returns "found" or "not_found".
         """
         if self.control:
             self.control.check()
 
-        log.info("เริ่มสุ่มสมบัติ (account_id=%s)...", account_id)
+        log.info("เริ่มสุ่มสมบัติ (account_id=%s)...", account.account_id,account.email,)
         found_treasures = {
             "victor": 0,
             "banana": 0,

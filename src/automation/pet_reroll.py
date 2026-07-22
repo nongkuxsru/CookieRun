@@ -230,11 +230,11 @@ class PetRerollController:
             if crystals_found:
                 log.info("เพชรหมดแล้ว (รอบฟักที่ %d)", hatch_num)
                 self.recorder.record_failed_account(
-                    account_id, reason=f"เพชรหมด (hatch #{hatch_num})"
+                    account.account_id, reason=f"เพชรหมด (hatch #{hatch_num})"
                 )
                 # Crystals_left_close → close_hatch_popup → close_bag_pet
                 self._close_on_crystals_empty()
-                return "exhausted", account_id
+                return "exhausted", account.account_id
 
             # ── ข้ามแอนิเมชันสุ่ม (skip_hatch) ──
             self.runner.run_step(skip_step)
@@ -252,16 +252,19 @@ class PetRerollController:
                     )
                     screenshot_path = f"logs/found_pet_{account.account_id}.png"
                     self.adb.save_screenshot(screenshot_path)
+
+                    account.pet_name = self.target_pet_key
+                    
                     self.recorder.record_found_pet(
-                        account_id,
+                        account.account_id,
                         self.target_pet_key,
                         screenshot_path,
                         note=f"hatch #{hatch_num}",
-                        treasures=""   # หรือใส่ชื่อ treasure ถ้ามี
-                        account.pet_name = self.target_pet_key
+                        treasures="",   # หรือใส่ชื่อ treasure ถ้ามี
+                        
                     )
                     self._return_to_lobby_after_target_found()
-                    return "found", account_id
+                    return "found", account.account_id
 
             # ── ไม่ตรงเป้าหมาย → ปิด popup สัตว์ใหม่แล้ววนกลับไป hatch อีกรอบ ──
             self._tap_template(_CLOSE_POPUP_NEWPET, "pet_close_popup_new")
@@ -269,10 +272,10 @@ class PetRerollController:
 
         log.warning("ฟักครบ %d ครั้งแล้วยังไม่เจอเป้าหมาย", self.max_hatches)
         self.recorder.record_failed_account(
-            account_id, reason="เกินจำนวนฟักสูงสุด"
+            account.account_id, reason="เกินจำนวนฟักสูงสุด"
         )
         self._close_pet_bag()
-        return "exhausted", account_id
+        return "exhausted", account.account_id
 
     def run_one_account_cycle(
         self, treasure_controller: TreasureRerollController
@@ -287,30 +290,29 @@ class PetRerollController:
         account = AccountInfo(
             email=email,
             password=password,
-            account_id=account_id,
         )
-        log.info("[%s] เริ่มรอบบัญชีใหม่", account_id)
+        log.info("[%s] เริ่มรอบบัญชีใหม่", account.account_id)
 
         # รับของขวัญใน mail
         ClaimMailController(self.runner, control=self.control).run()
 
         # === สุ่มสมบัติก่อน ===
-        log.info("[%s] เริ่มสุ่มสมบัติ...", account_id)
+        log.info("[%s] เริ่มสุ่มสมบัติ...", account.account_id)
         treasure_outcome = treasure_controller.run(account)
 
         if treasure_outcome != "found":
-            log.info("[%s] ไม่เจอสมบัติที่ต้องการ → ออกจากระบบ", account_id)
+            log.info("[%s] ไม่เจอสมบัติที่ต้องการ → ออกจากระบบ", account.account_id)
             log.info("logout_controller = %s", self.logout_controller)
             if self.logout_controller:
                 self.logout_controller.logout_account()
-            return "logout", account_id
+            return "logout", account.account_id
 
         # === เจอสมบัติแล้ว → สุ่มสัตว์เลี้ยง ===
-        log.info("[%s] เจอสมบัติแล้ว เริ่มสุ่มสัตว์เลี้ยง...", account_id)
+        log.info("[%s] เจอสมบัติแล้ว เริ่มสุ่มสัตว์เลี้ยง...", account.account_id)
         pet_outcome = self.hatch_until_result(account) # ใช้ pet_account_id เพื่อความปลอดภัย
 
         if pet_outcome == "found":
-            log.info("[%s] ✅ เจอทั้งสมบัติและสัตว์เลี้ยง — เก็บไอดี", account_id)
+            log.info("[%s] ✅ เจอทั้งสมบัติและสัตว์เลี้ยง — เก็บไอดี", account.account_id)
 
             # === บันทึกข้อมูลบัญชี ===
             email = self.game_flow.current_email if hasattr(self.game_flow, 'current_email') else "unknown"
@@ -327,7 +329,7 @@ class PetRerollController:
 
                 if self.discord:
                     self.discord.found.send_found_account(
-                        account_id=account_id,
+                        account_id=account.account_id,
                         target_item=f"{self.target_pet_key} + Treasure",
                         screenshot_path=screenshot,
                     )
@@ -339,10 +341,10 @@ class PetRerollController:
             if self.logout_controller:
                 self.logout_controller.logout_account()
 
-            return "kept", account_id
+            return "kept", account.account_id
 
         else:
-            log.info("[%s]  เจอสมบัติแต่ไม่เจอสัตว์เลี้ยง → ออกจากระบบ", account_id)
+            log.info("[%s]  เจอสมบัติแต่ไม่เจอสัตว์เลี้ยง → ออกจากระบบ", account.account_id,)
             if self.logout_controller:
                 self.logout_controller.logout_account()
-            return "logout", account_id
+            return "logout", account.account_id
