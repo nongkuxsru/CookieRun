@@ -98,8 +98,10 @@ class TreasureRerollController:
         self.auto.tap("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
         self.auto.tap("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
 
+        
+        screenshot_path = f"logs/found_treasure_{account.email}.png"
         account.screenshot_path = screenshot_path
-        screenshot_path = f"logs/found_treasure_{account.account_id}.png"
+        
         self.adb.save_screenshot(screenshot_path)
         log.info("บันทึกภาพกระเป๋าสมบัติไว้ที่ %s", screenshot_path)
         
@@ -130,7 +132,7 @@ class TreasureRerollController:
         if self.result_service.has_target(found_treasures):
 
             self.result_service.record_success(
-                account.account_id,
+                account,
                 self.target_treasure_key,
                 found_treasures,
             )
@@ -150,7 +152,7 @@ class TreasureRerollController:
             return "found"
 
         self.result_service.record_failed(
-            account.account_id,
+            account.email,
             found_treasures,
         )
 
@@ -233,7 +235,7 @@ class TreasureRerollController:
         if self.control:
             self.control.check()
 
-        log.info("[%s] เริ่มสุ่มสมบัติ...", account.account_id)
+        log.info("[%s] เริ่มสุ่มสมบัติ...", account.email)
 
         found_treasures = {
             "victor": 0,

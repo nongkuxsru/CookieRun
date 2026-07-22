@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.core.logger import get_logger
 from src.data.recorder import Recorder
+from src.models.account_info import AccountInfo
 
 log = get_logger(__name__)
 
@@ -19,24 +20,29 @@ class TreasureResultService:
 
     def record_success(
         self,
-        account_id: str,
+        account: AccountInfo,
         treasure_key: str,
         found_treasures: dict[str, int],
     ) -> None:
+        account.pet_name = treasure_key
+
+        account.pet_image_path = (
+            f"logs/found_treasure_{account.account_id}.png"
+        )
+
+        account.treasures = [
+            f"Victor={found_treasures['victor']}",
+            f"Banana={found_treasures['banana']}",
+            f"Coin={found_treasures['coin']}",
+        ]
+
 
         self.recorder.record_found_pet(
-            account_id,
-            treasure_key,
-            f"logs/found_treasure_{account_id}.png",
+            account,
             note=(
                 f"Victor x{found_treasures['victor']} | "
                 f"Banana x{found_treasures['banana']} | "
                 f"Coin x{found_treasures['coin']}"
-            ),
-            treasures=(
-                f"Victor={found_treasures['victor']}, "
-                f"Banana={found_treasures['banana']}, "
-                f"Coin={found_treasures['coin']}"
             ),
         )
 

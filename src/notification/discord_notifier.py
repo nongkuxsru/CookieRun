@@ -111,15 +111,86 @@ class DiscordNotifier:
             if files:
                 files["file"].close()
 
-    def send_message(self, message: str):
-        """ส่งข้อความธรรมดา (เช่น จบ instance)"""
+    def send_embed(
+        self,
+        title: str,
+        outcome: str,
+        error: str | None = None,
+    ):
+        """
+        ส่ง Discord Embed สำหรับแจ้งสถานะ instance
+        """
+
         if not self.enabled:
             return
 
+
+        # สี Embed
+        if error:
+            color = 0xE74C3C   # แดง
+            status_icon = "❌ ERROR"
+        else:
+            color = 0x2ECC71   # เขียว
+            status_icon = "✅ SUCCESS"
+
+
+        fields = [
+            {
+                "name": "📌 Status",
+                "value": status_icon,
+                "inline": True,
+            },
+            {
+                "name": "📋 Outcome",
+                "value": str(outcome),
+                "inline": True,
+            },
+            {
+                "name": "🕒 Time",
+                "value": datetime.now(
+                    timezone.utc
+                ).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "inline": False,
+            },
+        ]
+
+
+        if error:
+            # กัน Discord limit
+            if len(error) > 1000:
+                error = error[-1000:]
+
+            fields.append(
+                {
+                    "name": "🔥 Error Detail",
+                    "value": f"```python\n{error}\n```",
+                    "inline": False,
+                }
+            )
+
+
         payload = {
             "username": "Nongku BOT",
-            "content": message
+
+            "embeds": [
+                {
+                    "title": title,
+
+                    "color": color,
+
+                    "fields": fields,
+
+                    "footer": {
+                        "text": "CookieRun Automation System"
+                    },
+
+                    "timestamp": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                }
+            ],
         }
+
 
         try:
             response = requests.post(
@@ -129,12 +200,18 @@ class DiscordNotifier:
             )
 
             if response.status_code in (200, 204):
-                log.info("ส่งข้อความ Discord สำเร็จ")
+                log.info(
+                    "ส่ง Discord Embed สำเร็จ"
+                )
+
             else:
                 log.warning(
                     "ส่ง Discord ไม่สำเร็จ: %s %s",
                     response.status_code,
                     response.text,
                 )
+
         except Exception:
-            log.exception("เชื่อมต่อ Discord ล้มเหลว")
+            log.exception(
+                "เชื่อมต่อ Discord ล้มเหลว"
+            )

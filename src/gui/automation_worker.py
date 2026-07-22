@@ -13,6 +13,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+import traceback
 from typing import Callable, Literal
 
 from src.automation.logout import AccountLogoutController
@@ -33,6 +34,7 @@ from src.core.logger import get_logger
 from src.data.recorder import Recorder
 from src.emulator.emulator_controller import EmulatorController   # ← เพิ่มบรรทัดนี้\
 from src.notification.discord_manager import DiscordManager
+
 
 log = get_logger(__name__)
 
@@ -324,15 +326,21 @@ class AutomationWorker:
                     time.sleep(2)
 
         except Exception as e:
-            log.exception(f"[{tag}] ERROR ใหญ่เกิดขึ้น: {e}")
+            error_detail = traceback.format_exc()
+            if len(error_detail) > 1500:
+                error_detail = error_detail[-1500:]
+            log.exception(
+                f"[{tag}] ERROR ใหญ่เกิดขึ้น: {e}"
+            )
         finally:
             log.info(f"[{tag}] จบการทำงานของ instance นี้")
-            
-            # === แจ้ง Discord เมื่อจบ instance ===
+
             try:
-                self.discord.status.send_message(
-                    f"**[{tag}]** จบการทำงานของ instance นี้\n"
-                    f"สถานะ: {outcome}"
+                self.discord.status.send_embed(
+                    title=f"🤖 Instance Finished : {tag}",
+                    outcome=outcome,
+                    error=error_detail,
                 )
+
             except Exception as e:
                 log.warning(f"ส่ง Discord ล้มเหลว: {e}")
