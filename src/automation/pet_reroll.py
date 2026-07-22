@@ -20,6 +20,7 @@ from src.data.recorder import Recorder
 from datetime import datetime
 from pathlib import Path
 from src.notification.discord_manager import DiscordManager
+from src.models.account_info import AccountInfo
 
 log = get_logger(__name__)
 
@@ -199,9 +200,8 @@ class PetRerollController:
     def _current_account_id(self) -> str:
         return time.strftime("acct_%Y%m%d_%H%M%S")
 
-    def hatch_until_result(self) -> tuple[str, str]:
+    def hatch_until_result(self, account: AccountInfo) -> str:
         """Returns (\"found\" | \"exhausted\", account_id)."""
-        account_id = self._current_account_id()
         target_tpl = self._resolve_target_template()
 
         if not target_tpl:
@@ -250,7 +250,7 @@ class PetRerollController:
                         target_result.confidence,
                         hatch_num,
                     )
-                    screenshot_path = f"logs/found_pet_{account_id}.png"
+                    screenshot_path = f"logs/found_pet_{account.account_id}.png"
                     self.adb.save_screenshot(screenshot_path)
                     self.recorder.record_found_pet(
                         account_id,
@@ -258,6 +258,7 @@ class PetRerollController:
                         screenshot_path,
                         note=f"hatch #{hatch_num}",
                         treasures=""   # หรือใส่ชื่อ treasure ถ้ามี
+                        account.pet_name = self.target_pet_key
                     )
                     self._return_to_lobby_after_target_found()
                     return "found", account_id
@@ -280,7 +281,14 @@ class PetRerollController:
         self.game_flow.ensure_ready()
 
         # สร้าง account_id ครั้งเดียวตั้งแต่ต้นรอบ
-        account_id = self._current_account_id()
+        email = getattr(self.game_flow, "current_email", "")
+        password = getattr(self.game_flow, "current_password", "")
+
+        account = AccountInfo(
+            email=email,
+            password=password,
+            account_id=account_id,
+        )
         log.info("[%s] เริ่มรอบบัญชีใหม่", account_id)
 
         # รับของขวัญใน mail
@@ -288,7 +296,7 @@ class PetRerollController:
 
         # === สุ่มสมบัติก่อน ===
         log.info("[%s] เริ่มสุ่มสมบัติ...", account_id)
-        treasure_outcome = treasure_controller.run(account_id)
+        treasure_outcome = treasure_controller.run(account)
 
         if treasure_outcome != "found":
             log.info("[%s] ไม่เจอสมบัติที่ต้องการ → ออกจากระบบ", account_id)
@@ -299,7 +307,7 @@ class PetRerollController:
 
         # === เจอสมบัติแล้ว → สุ่มสัตว์เลี้ยง ===
         log.info("[%s] เจอสมบัติแล้ว เริ่มสุ่มสัตว์เลี้ยง...", account_id)
-        pet_outcome, pet_account_id = self.hatch_until_result()  # ใช้ pet_account_id เพื่อความปลอดภัย
+        pet_outcome = self.hatch_until_result(account) # ใช้ pet_account_id เพื่อความปลอดภัย
 
         if pet_outcome == "found":
             log.info("[%s] ✅ เจอทั้งสมบัติและสัตว์เลี้ยง — เก็บไอดี", account_id)
@@ -315,7 +323,7 @@ class PetRerollController:
             
             # === แจ้ง Discord ===
             try:
-                screenshot = f"logs/found_pet_{account_id}.png"
+                screenshot = f"logs/found_pet_{account.account_id}.png"
 
                 if self.discord:
                     self.discord.found.send_found_account(

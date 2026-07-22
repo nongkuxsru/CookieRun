@@ -1023,7 +1023,7 @@ class BotApp(tb.Window):
             port = inst.adb_address.rsplit(":", 1)[-1]
             window = inst.window.title if getattr(inst, 'window', None) else "ไม่พบ"
             
-            label = f"จอ {i} • {inst.name} • port {port}\n   └ {window} [{self.instance_status[i]}]"
+            label = f"จอ {i+1} • {inst.name} • port {port}\n   └ {window} [{self.instance_status[i]}]"
             # ... pack
             self._themed_checkbutton(self.instance_rows_frame, label, var).pack(
                 anchor=W, pady=2, fill=X
