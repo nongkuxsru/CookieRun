@@ -36,7 +36,13 @@ class DiscordNotifier:
         embed = {
             "title": "🎉 Found Target Account",
             "color": 0x2ECC71,
-            "timestamp": account.found_time.astimezone(timezone.utc).isoformat(),
+            timestamp = (
+                account.found_time
+                if account.found_time
+                else datetime.now()
+            )
+
+            embed["timestamp"] = timestamp.astimezone(timezone.utc).isoformat()
             "fields": [
                 {
                     "name": "📧 Email",
@@ -68,9 +74,12 @@ class DiscordNotifier:
 
         files = None
 
-        if account.screenshot_path and Path(account.screenshot_path).exists():
+        if account.pet_image_path and Path(account.pet_image_path).exists():
             files = {
-                "file": open(account.screenshot_path, "rb")
+                "file": open(account.pet_image_path, "rb")
+            }
+            embed["image"] = {
+                "url": "attachment://file"
             }
             payload["content"] = (
                 f"🎉 {account.email}\n"
