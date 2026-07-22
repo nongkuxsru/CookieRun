@@ -63,12 +63,7 @@ def build_skip_hatch_step() -> Step:
         post_delay=0.5,
     )
 
-def log_successful_account(
-    email: str,
-    password: str,
-    target_pet: str,
-    target_treasure: str = "N/A"
-) -> None:
+def log_successful_account(account: AccountInfo) -> None:
     """บันทึกบัญชีที่เจอของดี"""
     try:
         output_dir = Path("data_output")
@@ -77,7 +72,15 @@ def log_successful_account(
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        line = f"{email}|{password}|{target_pet}|{target_treasure}|{timestamp}\n"
+        treasures = ", ".join(account.treasures)
+
+        line = (
+            f"{account.email}|"
+            f"{account.password}|"
+            f"{account.pet_name}|"
+            f"{treasures}|"
+            f"{timestamp}\n"
+        )
         
         with open(output_file, "a", encoding="utf-8") as f:
             f.write(line)
@@ -311,12 +314,7 @@ class PetRerollController:
 
             # === บันทึกข้อมูลบัญชี ===
             email = self.game_flow.current_email if hasattr(self.game_flow, 'current_email') else "unknown"
-            log_successful_account(
-                email=email,
-                password=self.game_flow.current_password if hasattr(self.game_flow, 'current_password') else "Zxc.1234",
-                target_pet=self.target_pet_key,
-                target_treasure="found"   # หรือใส่ชื่อ treasure จริงถ้ามี
-            )
+            log_successful_account(account)
             
             # === แจ้ง Discord ===
             try:

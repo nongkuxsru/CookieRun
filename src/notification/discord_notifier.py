@@ -36,13 +36,7 @@ class DiscordNotifier:
         embed = {
             "title": "🎉 Found Target Account",
             "color": 0x2ECC71,
-            timestamp = (
-                account.found_time
-                if account.found_time
-                else datetime.now()
-            )
-
-            embed["timestamp"] = timestamp.astimezone(timezone.utc).isoformat()
+            "timestamp": account.found_time.astimezone(timezone.utc).isoformat(),
             "fields": [
                 {
                     "name": "📧 Email",
