@@ -40,7 +40,7 @@ def _button_step(
     name: str,
     template: str,
     *,
-    timeout: float = 15.0,
+    timeout: float = 0.5,
     on_missing: OnMissing = "raise",
     post_delay: float = 0.8,
     action=tap_matched_center,
@@ -271,7 +271,7 @@ def build_daily_checkin_steps() -> list[Step]:
     return steps
 
 def build_free_item_steps() -> list[Step]:
-    return [_button_step(f"free_item_confirm_{i:02d}", f"free_item/confirm_{i:02d}.png") for i in range(1, 7)]
+    return [_button_step(f"free_item_confirm_{i:02d}", f"free_item/confirm_{i:02d}.png") for i in range(1, 6)]
 
 def build_lobby_ready_step() -> Step:
     return Step(name="lobby_ready", templates=["login/lobby_marker.png"], action=None, timeout=30.0)
