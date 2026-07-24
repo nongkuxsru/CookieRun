@@ -13,7 +13,7 @@ emulator:
   - NemuPlayer.exe
   fallback_port_base: 16384
   fallback_port_step: 32
-  fallback_max_instances: 30
+  fallback_max_instances: 10
 game:
   package_name: com.devsisters.crg
   main_activity: com.devsisters.CookieRunForKakao.OvenbreakX

@@ -92,19 +92,18 @@ class TreasureRerollController:
         self.auto.tap(_CLOSE_POPUP_NEWTREASURE, "treasure_close_popup_new")
         time.sleep(0.5)
 
-    def _close_found(self, account: AccountInfo,) -> None:
+    def _close_found(self, account: AccountInfo) -> None:
         """ปิดและบันทึกเมื่อเจอสมบัติเป้าหมาย"""
-    
+
         self.auto.tap("treasure_reroll/close_treasure_draw.png", "treasure_close_draw")
         self.auto.tap("treasure_reroll/enter_treasure_cabinet.png", "treasure_enter_cabinet")
 
-        
-        screenshot_path = f"logs/found_treasure_{account.email}.png"
-        account.screenshot_path = screenshot_path
-        
-        self.adb.save_screenshot(screenshot_path)
-        log.info("บันทึกภาพกระเป๋าสมบัติไว้ที่ %s", screenshot_path)
-        
+        treasure_screenshot_path = f"logs/found_treasure_{account.email}.png"
+        account.treasure_screenshot_path = treasure_screenshot_path
+
+        self.adb.save_screenshot(treasure_screenshot_path)
+        log.info("บันทึกภาพกระเป๋าสมบัติไว้ที่ %s", treasure_screenshot_path)
+
         self.auto.tap("treasure_reroll/close_treasure_cabinet.png", "treasure_close_cabinet")
         self._close_treasure_bag()
     
@@ -234,8 +233,6 @@ class TreasureRerollController:
     def run(self, account: AccountInfo) -> str:
         if self.control:
             self.control.check()
-
-        log.info("[%s] เริ่มสุ่มสมบัติ...", account.email)
 
         found_treasures = {
             "victor": 0,

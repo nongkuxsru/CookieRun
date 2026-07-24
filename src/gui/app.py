@@ -37,6 +37,7 @@ from src.data.recorder import Recorder
 from src.gui.automation_worker import AutomationWorker
 from src.gui.log_queue_handler import QueueLogHandler
 from src.notification.discord_manager import DiscordManager
+from src.gui.found_detail_popup import FoundDetailPopup
 
 log = get_logger(__name__)
 
@@ -67,7 +68,7 @@ class BotApp(tb.Window):
         self.recorder = Recorder(self.config_obj.get("paths.output_dir", "data_output"))
         self.worker: AutomationWorker | None = None
         self.log_lines: list[str] = []
-        self.found_items: list[str] = []
+        self.found_items: list[dict] = []
         self.found_page_index = 0
         self.current_log_filter = tk.StringVar(value=_ALL_SCREENS_LABEL)
         self.current_mode = tk.StringVar(value="reroll")
@@ -485,26 +486,26 @@ class BotApp(tb.Window):
 
         nav_row = tb.Frame(header_row)
         nav_row.pack(side=RIGHT, padx=(0, 8))
-        tb.Button(
-            nav_row,
-            text="◄",
-            width=3,
-            bootstyle="secondary-outline",
-            command=self._on_found_prev,
-        ).pack(side=LEFT)
+        tb.Button(nav_row, text="◄", width=3, bootstyle="secondary-outline",
+                  command=self._on_found_prev).pack(side=LEFT)
         self.found_page_label = tb.Label(nav_row, text="0/0", width=6, anchor="center")
         self.found_page_label.pack(side=LEFT, padx=4)
-        tb.Button(
-            nav_row,
-            text="►",
-            width=3,
-            bootstyle="secondary-outline",
-            command=self._on_found_next,
-        ).pack(side=LEFT)
+        tb.Button(nav_row, text="►", width=3, bootstyle="secondary-outline",
+                  command=self._on_found_next).pack(side=LEFT)
 
-        self.found_text = ScrolledText(found_card, height=5, autohide=True, wrap="word")
-        self.found_text.pack(fill=X)
-        self.found_text.text.configure(state="disabled", font=("Consolas", 9))
+        # เปลี่ยนจาก ScrolledText -> Listbox เพื่อให้เลือกรายการได้แม่นยำ (รองรับดับเบิลคลิกด้วย)
+        list_frame = tb.Frame(found_card)
+        list_frame.pack(fill=X)
+        self.found_listbox = tk.Listbox(
+            list_frame, height=5, font=("Consolas", 9),
+            selectmode="browse", activestyle="none",
+        )
+        self.found_listbox.pack(side=LEFT, fill=X, expand=True)
+        self.found_listbox.bind("<Double-Button-1>", lambda _e: self._show_selected_detail())
+        found_scroll = tb.Scrollbar(list_frame, orient="vertical", command=self.found_listbox.yview)
+        found_scroll.pack(side=RIGHT, fill=Y)
+        self.found_listbox.configure(yscrollcommand=found_scroll.set)
+
         self._render_found_page()
 
     # ------------------------------------------------- left: shared panel --
@@ -893,8 +894,8 @@ class BotApp(tb.Window):
         changed = False
         try:
             while True:
-                item = self.found_queue.get_nowait()
-                self.found_items.append(item)
+                record = self.found_queue.get_nowait()   # ตอนนี้เป็น dict เต็ม ไม่ใช่ string
+                self.found_items.append(record)
                 changed = True
         except queue.Empty:
             pass
@@ -905,26 +906,32 @@ class BotApp(tb.Window):
             self._render_found_page()
         self.after(300, self._poll_found_queue)
 
+    def _format_found_line(self, record: dict) -> str:
+        treasures = ", ".join(record.get("treasures") or []) or "-"
+        pet = record.get("pet_name") or "-"
+        return (
+            f"{record.get('time', '')} | {record.get('instance', '')} | "
+            f"{record.get('email', '')} | {pet} | {treasures}"
+        )
+
     def _render_found_page(self) -> None:
-        widget = self.found_text.text
-        widget.configure(state="normal")
-        widget.delete("1.0", "end")
+        self.found_listbox.delete(0, "end")
 
         total = len(self.found_items)
         if total == 0:
-            widget.insert("end", "ยังไม่มี — กำลังสุ่ม...")
+            self.found_listbox.insert("end", "ยังไม่มี — กำลังสุ่ม...")
             self.found_page_label.configure(text="0/0")
-        else:
-            total_pages = max(1, (total + _FOUND_PAGE_SIZE - 1) // _FOUND_PAGE_SIZE)
-            self.found_page_index = min(self.found_page_index, total_pages - 1)
-            start = self.found_page_index * _FOUND_PAGE_SIZE
-            page_items = self.found_items[start : start + _FOUND_PAGE_SIZE]
-            widget.insert("end", "\n".join(page_items))
-            self.found_page_label.configure(
-                text=f"{self.found_page_index + 1}/{total_pages}"
-            )
+            return
 
-        widget.configure(state="disabled")
+        total_pages = max(1, (total + _FOUND_PAGE_SIZE - 1) // _FOUND_PAGE_SIZE)
+        self.found_page_index = min(self.found_page_index, total_pages - 1)
+        start = self.found_page_index * _FOUND_PAGE_SIZE
+        page_items = self.found_items[start : start + _FOUND_PAGE_SIZE]
+
+        for record in page_items:
+            self.found_listbox.insert("end", self._format_found_line(record))
+
+        self.found_page_label.configure(text=f"{self.found_page_index + 1}/{total_pages}")
 
     def _on_found_prev(self) -> None:
         if self.found_page_index > 0:
@@ -932,9 +939,7 @@ class BotApp(tb.Window):
             self._render_found_page()
 
     def _on_found_next(self) -> None:
-        total_pages = max(
-            1, (len(self.found_items) + _FOUND_PAGE_SIZE - 1) // _FOUND_PAGE_SIZE
-        )
+        total_pages = max(1, (len(self.found_items) + _FOUND_PAGE_SIZE - 1) // _FOUND_PAGE_SIZE)
         if self.found_page_index < total_pages - 1:
             self.found_page_index += 1
             self._render_found_page()
@@ -943,41 +948,26 @@ class BotApp(tb.Window):
         if not self.found_items:
             messagebox.showinfo("แจ้งเตือน", "ยังไม่มีไอดีที่เจอให้คัดลอก")
             return
+        lines = [self._format_found_line(r) for r in self.found_items]
         self.clipboard_clear()
-        self.clipboard_append("\n".join(self.found_items))
-        messagebox.showinfo(
-            "คัดลอกแล้ว", f"คัดลอกไอดีที่เจอทั้งหมด {len(self.found_items)} รายการแล้ว"
-        )
-    def _show_found_detail(self, account_id):
-        # หาข้อมูลจาก self.found_items หรือ database
-        data = next((item for item in self.found_items if account_id in item), None)
-        if data:
-            popup = FoundDetailPopup(self, {"account_id": account_id, "screenshot": "logs/xxx.png"})
-            popup.grab_set()
-    def _show_selected_detail(self):
-        """แสดง Popup รายละเอียดไอดีที่เลือก"""
-        try:
-            # ดึงข้อมูลจาก found_text (หรือเก็บใน list)
-            selected_text = self.found_text.text.get("sel.first", "sel.last")
-            if not selected_text:
-                messagebox.showinfo("แจ้งเตือน", "กรุณาเลือกไอดีที่ต้องการดูรายละเอียด")
-                return
+        self.clipboard_append("\n".join(lines))
+        messagebox.showinfo("คัดลอกแล้ว", f"คัดลอกไอดีที่เจอทั้งหมด {len(self.found_items)} รายการแล้ว")
 
-            account_id = selected_text.split("|")[2].strip() if "|" in selected_text else selected_text.strip()
+    def _show_selected_detail(self) -> None:
+        """แสดง Popup รายละเอียดไอดีที่เลือกจริง (ไม่ใช่ข้อมูลตัวอย่างอีกต่อไป)"""
+        selection = self.found_listbox.curselection()
+        if not selection:
+            messagebox.showinfo("แจ้งเตือน", "กรุณาเลือกไอดีที่ต้องการดูรายละเอียด")
+            return
 
-            # สร้างข้อมูลตัวอย่าง (คุณสามารถดึงจาก database ได้)
-            data = {
-                "account_id": account_id,
-                "timestamp": "2026-07-08 19:xx",
-                "treasures": "Victor’s Feather Laurel Wreath, Jingle-jangle Coin Wallet",
-                "pets": "Tater Trader",
-                "screenshot": f"logs/found_pet_{account_id}.png"
-            }
+        start = self.found_page_index * _FOUND_PAGE_SIZE
+        record_index = start + selection[0]
+        if record_index >= len(self.found_items):
+            return
 
-            popup = FoundDetailPopup(self, data)
-            popup.grab_set()
-        except:
-            messagebox.showwarning("แจ้งเตือน", "ไม่สามารถแสดงรายละเอียดได้")
+        record = self.found_items[record_index]
+        popup = FoundDetailPopup(self, record)
+        popup.grab_set()
 
     # ------------------------------------------------------------ stats --
     def _poll_stats(self) -> None:

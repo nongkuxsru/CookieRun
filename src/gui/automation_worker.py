@@ -190,9 +190,13 @@ class AutomationWorker:
         tag = inst.name
         from src.core.logger import set_instance_context
         set_instance_context(tag)
-        
+
         cfg = self.config
         log.info(f"[{tag}] Worker เริ่มทำงาน (Debug Mode)")
+
+        # ── กำหนดค่าเริ่มต้นไว้ก่อน กันเคส error เกิดก่อนตัวแปรถูก assign ──
+        outcome = "unknown"
+        error_detail = None
 
         try:
             adb = self._connect(inst)
@@ -289,17 +293,26 @@ class AutomationWorker:
                         placeholder_id = time.strftime(f"{tag}_%Y%m%d_%H%M%S")
                         self.recorder.record_new_account(placeholder_id, new_accounts_file)
 
-                    outcome, account_id = pet_controller.run_one_account_cycle(treasure_controller)
+                    outcome, account = pet_controller.run_one_account_cycle(treasure_controller)
                     consecutive_errors = 0
 
                     if outcome == "kept":
                         self.stats.record_success()
-                        log.info("[%s] เจอครบทั้งคู่! เก็บไอดี=%s", tag, account_id)
+                        log.info("[%s] เจอครบทั้งคู่! อีเมล=%s", tag, account.email if account else "?")
 
-                        if self.found_queue is not None:
-                            self.found_queue.put(
-                                f"{time.strftime('%H:%M:%S')} | {tag} | {account_id} | {target_display_name}"
-                            )
+                        if self.found_queue is not None and account is not None:
+                            self.found_queue.put({
+                                "time": time.strftime("%H:%M:%S"),
+                                "instance": tag,
+                                "email": account.email,
+                                "password": account.password,
+                                "pet_name": account.pet_name,
+                                "treasures": list(account.treasures),
+                                "treasure_screenshot_path": account.treasure_screenshot_path,
+                                "pet_screenshot_path": account.pet_screenshot_path,
+                                "target_display_name": target_display_name,
+                                "found_time": account.found_time.strftime("%Y-%m-%d %H:%M:%S"),
+                            })
 
                         log.info("[%s] Logout แล้ว เริ่มสร้างบัญชีใหม่...", tag)
                         continue
@@ -312,7 +325,7 @@ class AutomationWorker:
                     else:
                         self.stats.record_failed()
                         log.info("[%s] จบการทำงานด้วยสถานะ %s", tag, outcome)
-                        continue
+                        continuee
                 except AutomationCancelled:
                     log.info("[%s] ถูกยกเลิกโดยผู้ใช้", tag)
                     break
@@ -326,6 +339,7 @@ class AutomationWorker:
                     time.sleep(2)
 
         except Exception as e:
+            outcome = "error"
             error_detail = traceback.format_exc()
             if len(error_detail) > 1500:
                 error_detail = error_detail[-1500:]

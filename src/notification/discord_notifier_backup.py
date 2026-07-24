@@ -28,44 +28,37 @@ class DiscordNotifier:
             return
 
         treasure_text = (
-            "\n".join(f"💎 {t}" for t in account.treasures)
+            "\n".join(f"• {t}" for t in account.treasures)
             if account.treasures
-            else "_ไม่มีข้อมูล_"
+            else "-"
         )
 
         embed = {
-            "author": {
-                "name": "CookieRun Auto Reroll",
-            },
-            "title": "🎉 เจอบัญชีเป้าหมายแล้ว!",
-            "description": "ระบบสุ่มเจอบัญชีที่ตรงเงื่อนไขทั้งหมด พร้อมเก็บไว้ใช้งานได้เลย",
+            "title": "🎉 Found Target Account",
             "color": 0x2ECC71,
+            "timestamp": account.found_time.astimezone(timezone.utc).isoformat(),
             "fields": [
                 {
-                    "name": "📧 อีเมล",
-                    "value": f"```{account.email}```",
+                    "name": "📧 Email",
+                    "value": f"`{account.email}`",
                     "inline": False,
                 },
                 {
-                    "name": "🔑 รหัสผ่าน",
-                    "value": f"||```{account.password}```||",
+                    "name": "🔑 Password",
+                    "value": f"`{account.password}`",
                     "inline": False,
                 },
                 {
-                    "name": "🐾 สัตว์เลี้ยง",
-                    "value": f"**{account.pet_name}**" if account.pet_name else "-",
+                    "name": "🐾 Pet",
+                    "value": account.pet_name or "-",
                     "inline": True,
                 },
                 {
-                    "name": "💎 สมบัติที่เจอ",
+                    "name": "💎 Treasure",
                     "value": treasure_text,
                     "inline": True,
                 },
             ],
-            "footer": {
-                "text": "CookieRun Automation System",
-            },
-            "timestamp": account.found_time.astimezone(timezone.utc).isoformat(),
         }
 
         payload = {
@@ -74,14 +67,18 @@ class DiscordNotifier:
         }
 
         files = None
-        screenshot_path = getattr(account, "pet_screenshot_path", None) or getattr(account, "treasure_screenshot_path", None)
 
-        if screenshot_path and Path(screenshot_path).exists():
-            filename = Path(screenshot_path).name
+        if account.pet_image_path and Path(account.pet_image_path).exists():
             files = {
-                "file": (filename, open(screenshot_path, "rb")),
+                "file": open(account.pet_image_path, "rb")
             }
-            embed["image"] = {"url": f"attachment://{filename}"}
+            embed["image"] = {
+                "url": "attachment://file"
+            }
+            payload["content"] = (
+                f"🎉 {account.email}\n"
+                f"🐾 {account.pet_name}"
+            )
 
         try:
             if files:
@@ -112,7 +109,7 @@ class DiscordNotifier:
 
         finally:
             if files:
-                files["file"][1].close()
+                files["file"].close()
 
     def send_embed(
         self,
@@ -120,55 +117,80 @@ class DiscordNotifier:
         outcome: str,
         error: str | None = None,
     ):
-        """ส่ง Discord Embed สำหรับแจ้งสถานะ instance"""
+        """
+        ส่ง Discord Embed สำหรับแจ้งสถานะ instance
+        """
+
         if not self.enabled:
             return
 
+
+        # สี Embed
         if error:
-            color = 0xE74C3C
+            color = 0xE74C3C   # แดง
             status_icon = "❌ ERROR"
         else:
-            color = 0x3498DB
+            color = 0x2ECC71   # เขียว
             status_icon = "✅ SUCCESS"
+
 
         fields = [
             {
-                "name": "📌 สถานะ",
+                "name": "📌 Status",
                 "value": status_icon,
                 "inline": True,
             },
             {
-                "name": "📋 ผลลัพธ์",
-                "value": f"`{outcome}`",
+                "name": "📋 Outcome",
+                "value": str(outcome),
                 "inline": True,
+            },
+            {
+                "name": "🕒 Time",
+                "value": datetime.now(
+                    timezone.utc
+                ).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "inline": False,
             },
         ]
 
+
         if error:
+            # กัน Discord limit
             if len(error) > 1000:
                 error = error[-1000:]
+
             fields.append(
                 {
-                    "name": "🔥 รายละเอียด Error",
+                    "name": "🔥 Error Detail",
                     "value": f"```python\n{error}\n```",
                     "inline": False,
                 }
             )
 
+
         payload = {
             "username": "Nongku BOT",
+
             "embeds": [
                 {
                     "title": title,
+
                     "color": color,
+
                     "fields": fields,
+
                     "footer": {
-                        "text": "CookieRun Automation System",
+                        "text": "CookieRun Automation System"
                     },
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+
+                    "timestamp": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
                 }
             ],
         }
+
 
         try:
             response = requests.post(
@@ -178,7 +200,10 @@ class DiscordNotifier:
             )
 
             if response.status_code in (200, 204):
-                log.info("ส่ง Discord Embed สำเร็จ")
+                log.info(
+                    "ส่ง Discord Embed สำเร็จ"
+                )
+
             else:
                 log.warning(
                     "ส่ง Discord ไม่สำเร็จ: %s %s",
@@ -187,4 +212,6 @@ class DiscordNotifier:
                 )
 
         except Exception:
-            log.exception("เชื่อมต่อ Discord ล้มเหลว")
+            log.exception(
+                "เชื่อมต่อ Discord ล้มเหลว"
+            )

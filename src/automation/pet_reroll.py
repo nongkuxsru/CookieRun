@@ -234,7 +234,7 @@ class PetRerollController:
                 )
                 # Crystals_left_close → close_hatch_popup → close_bag_pet
                 self._close_on_crystals_empty()
-                return "exhausted", account.email
+                return "exhausted"
 
             # ── ข้ามแอนิเมชันสุ่ม (skip_hatch) ──
             self.runner.run_step(skip_step)
@@ -250,11 +250,12 @@ class PetRerollController:
                         target_result.confidence,
                         hatch_num,
                     )
+                    # ในเมธอด hatch_until_result, จุดที่เจอเป้าหมาย:
                     screenshot_path = f"logs/found_pet_{account.email}.png"
                     self.adb.save_screenshot(screenshot_path)
 
                     account.pet_name = self.target_pet_key
-                    account.screenshot_path = screenshot_path
+                    account.pet_screenshot_path = screenshot_path   # เปลี่ยนจาก account.screenshot_path
                     
                     self.recorder.record_found_pet(
                         account,
@@ -262,7 +263,7 @@ class PetRerollController:
                     )
 
                     self._return_to_lobby_after_target_found()
-                    return "found", account.email
+                    return "found"
 
             # ── ไม่ตรงเป้าหมาย → ปิด popup สัตว์ใหม่แล้ววนกลับไป hatch อีกรอบ ──
             self._tap_template(_CLOSE_POPUP_NEWPET, "pet_close_popup_new")
@@ -273,67 +274,58 @@ class PetRerollController:
             account.email, reason="เกินจำนวนฟักสูงสุด"
         )
         self._close_pet_bag()
-        return "exhausted", account.email
+        return "exhausted"
 
     def run_one_account_cycle(
         self, treasure_controller: TreasureRerollController
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, AccountInfo | None]:
         """Full account cycle: รับ mail → สุ่มสมบัติ → สุ่มสัตว์เลี้ยง"""
         self.game_flow.ensure_ready()
 
-        # สร้าง account_id ครั้งเดียวตั้งแต่ต้นรอบ
         email = getattr(self.game_flow, "current_email", "")
         password = getattr(self.game_flow, "current_password", "")
 
-        account = AccountInfo(
-            email=email,
-            password=password,
-        )
+        if not email:
+            log.warning(
+                "[%s] current_email ว่างเปล่า — เกมอาจข้ามหน้าล็อกอิน (อยู่ที่ lobby ตั้งแต่ต้น) "
+                "ทำให้อีเมลที่บันทึกอาจไม่ตรงกับบัญชีจริง",
+                getattr(self.game_flow, "current_email", "?"),
+            )
+
+        account = AccountInfo(email=email, password=password)
         log.info("[%s] เริ่มรอบบัญชีใหม่", account.email)
 
-        # รับของขวัญใน mail
         ClaimMailController(self.runner, control=self.control).run()
 
-        # === สุ่มสมบัติก่อน ===
         log.info("[%s] เริ่มสุ่มสมบัติ...", account.email)
         treasure_outcome = treasure_controller.run(account)
 
         if treasure_outcome != "found":
             log.info("[%s] ไม่เจอสมบัติที่ต้องการ → ออกจากระบบ", account.email)
-            log.info("logout_controller = %s", self.logout_controller)
             if self.logout_controller:
                 self.logout_controller.logout_account()
-            return "logout", account.email
+            return "logout", account          # ← คืน account object แทน account.email เดี่ยวๆ
 
-        # === เจอสมบัติแล้ว → สุ่มสัตว์เลี้ยง ===
         log.info("[%s] เจอสมบัติแล้ว เริ่มสุ่มสัตว์เลี้ยง...", account.email)
-        pet_outcome = self.hatch_until_result(account) # ใช้ pet_account_id เพื่อความปลอดภัย
+        pet_outcome = self.hatch_until_result(account)
 
         if pet_outcome == "found":
             log.info("[%s] ✅ เจอทั้งสมบัติและสัตว์เลี้ยง — เก็บไอดี", account.email)
-
-            # === บันทึกข้อมูลบัญชี ===
-            email = self.game_flow.current_email if hasattr(self.game_flow, 'current_email') else "unknown"
             log_successful_account(account)
-            
-            # === แจ้ง Discord ===
-            try:
-                screenshot = f"logs/found_pet_{account.email}.png"
 
+            try:
                 if self.discord:
                     self.discord.found.send_found_account(account)
-
             except Exception as e:
                 log.warning(f"ส่ง Discord ล้มเหลว: {e}")
 
-            # === Logout === #
             if self.logout_controller:
                 self.logout_controller.logout_account()
 
-            return "kept", account.email
+            return "kept", account            # ← คืน account object
 
         else:
-            log.info("[%s]  เจอสมบัติแต่ไม่เจอสัตว์เลี้ยง → ออกจากระบบ", account.email,)
+            log.info("[%s] เจอสมบัติแต่ไม่เจอสัตว์เลี้ยง → ออกจากระบบ", account.email)
             if self.logout_controller:
                 self.logout_controller.logout_account()
-            return "logout", account.email
+            return "logout", account
